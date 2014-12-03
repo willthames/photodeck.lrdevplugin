@@ -126,6 +126,7 @@ function exportServiceProvider.sectionsForTopOfDialog( f, propertyTable )
           enabled = true,
           action = function()
             propertyTable.httpResult = 'making api call'
+            PhotoDeckAPI.connect(propertyTable.apiKey, propertyTable.apiSecret)
             LrTasks.startAsyncTask(function()
               result, headers = PhotoDeckAPI.get('/ping.xml')
               propertyTable.httpResult = result
