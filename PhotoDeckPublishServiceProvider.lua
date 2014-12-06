@@ -118,6 +118,7 @@ function exportServiceProvider.sectionsForTopOfDialog( f, propertyTable )
           title = LrView.bind 'httpResult',
           alignment = 'right',
           fill_horizontal = 1,
+          height_in_lines = 5,
         },
 
         f:push_button {
