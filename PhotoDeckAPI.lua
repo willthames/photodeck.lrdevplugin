@@ -19,7 +19,7 @@ local function sign(method, uri, querystring)
 
   local request = string.format('%s\n%s\n%s\n%s\n%s\n', method, uri,
                                 querystring, PhotoDeckAPI.secret, timestamp)
-  local signature = PhotoDeckAPI.key .. ':' .. LrDigest.SHA256.digest(request)
+  local signature = PhotoDeckAPI.key .. ':' .. LrDigest.SHA1.digest(request)
   return {
     { field = 'X-PhotoDeck-TimeStamp', value=timestamp },
     { field = 'X-PhotoDeck-Authorization', value=signature },
@@ -49,14 +49,17 @@ end
 -- must be called within an LrTask
 function PhotoDeckAPI.get(uri, data)
   data = data or {}
-  logger:trace('entering get')
   local querystring = table_to_querystring(data)
 
   -- sign request
   local headers = sign('GET', uri, querystring)
-  LrDialogs.message('headers', headers['X-PhotoDeck-Authorization'], 'info')
-
-  logger:trace(headers)
+  --[[
+  hstring = ''
+  for _, h in ipairs(headers) do
+    hstring = hstring .. h.field .. ' = ' .. h.value .. "\n"
+  end
+  logger:trace(hstring)
+  --]]
 
   -- build full url
   local fullurl = urlprefix .. uri
