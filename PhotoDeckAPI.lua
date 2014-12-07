@@ -5,11 +5,17 @@ local LrHttp = import 'LrHttp'
 local LrTasks = import 'LrTasks'
 local logger = import 'LrLogger'( 'PhotoDeckAPI' )
 local LrStringUtils = import 'LrStringUtils'
+local TableUtils = require 'TableUtils'
+local TypeUtils = require 'TypeUtils'
+
 logger:enable('print')
 
 local urlprefix = 'http://api.photodeck.com'
+local isTable = TypeUtils.isTable
 
 PhotoDeckAPI = {}
+
+-- 
 
 -- sign API request according to docs at
 -- http://www.photodeck.com/developers/get-started/
@@ -77,16 +83,15 @@ function PhotoDeckAPI.get(uri, data)
   logger:trace(fullurl)
   result, resp_headers = LrHttp.get(fullurl, headers)
 
-  hstring = ''
-  for _, h in ipairs(resp_headers) do
-    hstring = hstring .. h.field .. ' = ' .. h.value .. "\n"
-  end
+  hstring = TableUtils.toString(resp_headers)
   logger:trace(hstring)
 
-  for _, h in ipairs(resp_headers) do
-    if h.field == 'Set-Cookie' and string.find(h.value, '_ficelle_session') then
-      PhotoDeckAPI.cookie = LrHttp.parsecookie(h)
-    end
+  cookies = TableUtils.filter(resp_headers, function(v)
+      return isTable(v) and v.field == 'Set-Cookie' and string.find(v.value, '_ficelle_session')
+    end)
+  if #cookies == 1 then
+    PhotoDeckAPI.cookie = LrHttp.parsecookie(cookies[1])
+    logger:trace(TableUtils.toString(PhotoDeckAPI.cookie))
   end
 
   return result

@@ -2,15 +2,25 @@ local TableUtils = require 'TableUtils'
 local filter = TableUtils.filter
 local map = TableUtils.map
 
-local t = { 'this', 'is', 'a', 'list' }
+local d2 = {
+  { field = 'key', value = 'value' }, 
+  { field = 'hello', value = 'world'}, 
+  { field = 'this', value = 'life' }
+}
 
-local tf = filter(t, function (v) return string.find(v, 'is') end)
-print(TableUtils.toString(tf))
+print(TableUtils.toString(d2))
 
-local d = { deeply = { this = 'has', more = 'complicated' }, structure = 5 }
+print(TableUtils.toString(map(d2, function(v) v.value = v.value .. '!'; return v end)))
 
-print(TableUtils.toString(d, '\n'))
+print(TableUtils.toString(filter(d2, function(v) return string.find(v.value, 'e') end)))
 
-local d2 = { key = 'value', hello = 'world', this = 'life' }
+local lrt = {
+  { field = 'Server', value = 'nginx' },
+  { field = 'Content-Type', value = 'aplication/xml' },
+}
 
-print(TableUtils.toString(map(d2, function(v) return v .. '!' end)))
+local lrtf = filter(lrt, function(v)
+    return v
+  end)
+
+print(TableUtils.toString(lrtf))
