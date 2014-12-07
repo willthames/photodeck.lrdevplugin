@@ -4,6 +4,7 @@ local LrDialogs = import 'LrDialogs'
 local LrHttp = import 'LrHttp'
 local LrTasks = import 'LrTasks'
 local logger = import 'LrLogger'( 'PhotoDeckAPI' )
+local LrStringUtils = import 'LrStringUtils'
 logger:enable('print')
 
 local urlprefix = 'http://api.photodeck.com'
@@ -29,6 +30,7 @@ end
 -- convert lua table to url encoded data
 -- from http://www.lua.org/pil/20.3.html
 local function table_to_querystring(data)
+  assert(data, isString)
   local function escape (s)
     s = string.gsub(s, "([&=+%c])", function (c)
            return string.format("%%%02X", string.byte(c))
@@ -48,29 +50,52 @@ end
 -- make HTTP GET request to PhotoDeck API
 -- must be called within an LrTask
 function PhotoDeckAPI.get(uri, data)
-  data = data or {}
-  local querystring = table_to_querystring(data)
+  local querystring = nil
+  if data then
+    querystring = table_to_querystring(data)
+  end
 
   -- sign request
   local headers = sign('GET', uri, querystring)
-  --[[
-  hstring = ''
-  for _, h in ipairs(headers) do
-    hstring = hstring .. h.field .. ' = ' .. h.value .. "\n"
+  -- set login cookies
+  if PhotoDeckAPI.cookie then
+    -- handle session expiry
+    table.insert(headers, { field = 'Cookie', value=PhotoDeckAPI.cookie.value })
+  else
+    if PhotoDeckAPI.username and PhotoDeckAPI.password then
+      authorization = 'Basic ' .. LrStringUtils.encodeBase64(PhotoDeckAPI.username ..
+                                                             ':' .. PhotoDeckAPI.password)
+      table.insert(headers, { field = 'Authorization',  value=authorization })
+    end
   end
-  logger:trace(hstring)
-  --]]
-
   -- build full url
   local fullurl = urlprefix .. uri
   if querystring then
     fullurl = fullurl .. '?' .. querystring
   end
   -- call API
-  return LrHttp.get(fullurl, headers)
+  logger:trace(fullurl)
+  result, resp_headers = LrHttp.get(fullurl, headers)
+
+  hstring = ''
+  for _, h in ipairs(resp_headers) do
+    hstring = hstring .. h.field .. ' = ' .. h.value .. "\n"
+  end
+  logger:trace(hstring)
+
+  for _, h in ipairs(resp_headers) do
+    if h.field == 'Set-Cookie' and string.find(h.value, '_ficelle_session') then
+      PhotoDeckAPI.cookie = LrHttp.parsecookie(h)
+    end
+  end
+
+  return result
 end
 
-function PhotoDeckAPI.connect(key, secret)
+function PhotoDeckAPI.connect(key, secret, username, password)
   PhotoDeckAPI.key = key
   PhotoDeckAPI.secret = secret
+  PhotoDeckAPI.username = username
+  PhotoDeckAPI.password = password
 end
+
