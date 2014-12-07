@@ -15,6 +15,7 @@ local exportServiceProvider = {}
 exportServiceProvider.supportsIncrementalPublish = true
 -- exportLocation gets replaced with PhotoDeck specific form section
 exportServiceProvider.hideSections = { 'exportLocation' }
+exportServiceProvider.small_icon = 'photodeck16.png'
 
 -- these fields get stored between uses
 exportServiceProvider.exportPresetFields = {
