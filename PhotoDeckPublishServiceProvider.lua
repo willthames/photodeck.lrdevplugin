@@ -7,7 +7,7 @@ local logger = import 'LrLogger'( 'PhotoDeckPublishServiceProvider' )
 
 logger:enable('print')
 
-require 'PhotoDeckAPI'
+local PhotoDeckAPI = require 'PhotoDeckAPI'
 
 local exportServiceProvider = {}
 
@@ -24,9 +24,9 @@ exportServiceProvider.exportPresetFields = {
   { key = 'fullname', default = "" },
   { key = 'apiKey', default = "" },
   { key = 'apiSecret', default = "" },
+  { key = 'website', default = "" },
 }
 
--- LrMobdebug.start()
 local function  updateApiKeyAndSecret(propertyTable)
   local f = LrView.osFactory()
   local c = f:column {
@@ -62,17 +62,41 @@ local function  updateApiKeyAndSecret(propertyTable)
   return propertyTable
 end
 
+local function login(propertyTable)
+  propertyTable.loggedinResult = 'logging in...'
+  PhotoDeckAPI.connect(propertyTable.apiKey, 
+       propertyTable.apiSecret, propertyTable.username, propertyTable.password)
+  LrTasks.startAsyncTask(function()
+    local result = PhotoDeckAPI.whoami()
+    propertyTable.loggedin = true
+    propertyTable.loggedinResult = 'Logged in as ' .. result.firstname .. ' ' .. result.lastname
+  end, 'PhotoDeckAPI Login')
+end
+
+local function getWebsites(propertyTable)
+  PhotoDeckAPI.connect(propertyTable.apiKey, 
+       propertyTable.apiSecret, propertyTable.username, propertyTable.password)
+  LrTasks.startAsyncTask(function()
+    propertyTable.websiteChoices = PhotoDeckAPI.websites()
+  end, 'PhotoDeckAPI Get Websites')
+end
+
 function exportServiceProvider.startDialog(propertyTable)
-  -- LrMobdebug.on()
-  if apiKey == '' or apiSecret == '' then
+  propertyTable.loggedin = false
+  if propertyTable.apiKey == '' or propertyTable.apiSecret == '' then
     propertyTable = updateApiKeyAndSecret(propertyTable)
+  end
+  if #propertyTable.username and #propertyTable.password and
+    #propertyTable.apiKey and #propertyTable.apiSecret then
+    login(propertyTable)
+    -- getWebsites(propertyTable)
   end
 end
 
 function exportServiceProvider.sectionsForTopOfDialog( f, propertyTable )
   -- LrMobdebug.on()
   propertyTable.httpResult = 'Awaiting instructions'
-  propertyTable.loggedinResult = ''
+  propertyTable.loggedinResult = 'Not logged in'
 
   local apiCredentials =  {
     title = LOC "$$$/PhotoDeck/ExportDialog/Account=PhotoDeck Plugin API keys",
@@ -142,7 +166,7 @@ function exportServiceProvider.sectionsForTopOfDialog( f, propertyTable )
   }
   local userCredentials = {
     title = LOC "$$$/PhotoDeck/ExportDialog/Account=PhotoDeck Account",
-    synopsis = LrView.bind 'httpResult',
+    synopsis = LrView.bind 'loggedinResult',
 
     f:row {
       bind_to_object = propertyTable,
@@ -170,37 +194,48 @@ function exportServiceProvider.sectionsForTopOfDialog( f, propertyTable )
           }
         },
       },
-    },
-    f:row {
-      spacing = f:control_spacing(),
+
+      f:push_button {
+        width = tonumber( LOC "$$$/locale_metric/PhotoDeck/ExportDialog/TestButton/Width=90" ),
+        title = 'Login',
+        enabled = LrView.bind 'loggedin',
+        action = function () login(propertyTable) end
+      },
 
       f:static_text {
         title = LrView.bind 'loggedinResult',
         alignment = 'right',
         fill_horizontal = 1,
-        height_in_lines = 5,
-      },
-
-      f:push_button {
-        width = tonumber( LOC "$$$/locale_metric/PhotoDeck/ExportDialog/TestButton/Width=90" ),
-        title = 'Test',
-        enabled = true,
-        action = function()
-          propertyTable.loggedinResult = 'making api call'
-          PhotoDeckAPI.connect(propertyTable.apiKey, propertyTable.apiSecret,
-                               propertyTable.username, propertyTable.password)
-          LrTasks.startAsyncTask(function()
-            result, headers = PhotoDeckAPI.get('/ping_auth.xml', { text = 'hello' })
-            propertyTable.loggedinResult = result
-          end, 'PhotoDeckAPI Login Test')
-        end,
+        height_in_lines = 1,
       },
 
     },
   }
+  local websiteChoice = {
+    title = LOC "$$$/PhotoDeck/ExportDialog/Account=PhotoDeck Website",
+    synopsis = LrView.bind 'websiteChosen',
+
+    f:row {
+      bind_to_object = propertyTable,
+
+      f:push_button {
+        enabled = true,
+        title = 'Get websites',
+        action = function () getWebsites(propertyTable) end
+      },
+
+      f:popup_menu {
+        items = LrView.bind 'websiteChoices',
+        value = LrView.bind 'websiteChosen',
+      }
+
+    }
+  }
+
   return {
     apiCredentials,
     userCredentials,
+    websiteChoice,
   }
 end
 
