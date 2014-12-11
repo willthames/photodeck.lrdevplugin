@@ -55,16 +55,24 @@ local function  updateApiKeyAndSecret(propertyTable)
       },
     },
   }
-  result = LrDialogs.presentModalDialog({
+  local result = LrDialogs.presentModalDialog({
     title = LOC "$$$/PhotoDeck/APIKeys=PhotoDeck API Keys",
     contents = c,
   })
   return propertyTable
 end
 
+local function ping(propertyTable)
+  propertyTable.pingResult = 'making api call'
+  PhotoDeckAPI.connect(propertyTable.apiKey, propertyTable.apiSecret)
+  LrTasks.startAsyncTask(function()
+    propertyTable.pingResult = PhotoDeckAPI.ping()
+  end, 'PhotoDeckAPI Ping')
+end
+
 local function login(propertyTable)
   propertyTable.loggedinResult = 'logging in...'
-  PhotoDeckAPI.connect(propertyTable.apiKey, 
+  PhotoDeckAPI.connect(propertyTable.apiKey,
        propertyTable.apiSecret, propertyTable.username, propertyTable.password)
   LrTasks.startAsyncTask(function()
     local result = PhotoDeckAPI.whoami()
@@ -74,7 +82,7 @@ local function login(propertyTable)
 end
 
 local function getWebsites(propertyTable)
-  PhotoDeckAPI.connect(propertyTable.apiKey, 
+  PhotoDeckAPI.connect(propertyTable.apiKey,
        propertyTable.apiSecret, propertyTable.username, propertyTable.password)
   LrTasks.startAsyncTask(function()
     propertyTable.websiteChoices = PhotoDeckAPI.websites()
@@ -86,21 +94,22 @@ function exportServiceProvider.startDialog(propertyTable)
   if propertyTable.apiKey == '' or propertyTable.apiSecret == '' then
     propertyTable = updateApiKeyAndSecret(propertyTable)
   end
+  ping(propertyTable)
   if #propertyTable.username and #propertyTable.password and
     #propertyTable.apiKey and #propertyTable.apiSecret then
     login(propertyTable)
-    -- getWebsites(propertyTable)
+    getWebsites(propertyTable)
   end
 end
 
 function exportServiceProvider.sectionsForTopOfDialog( f, propertyTable )
   -- LrMobdebug.on()
-  propertyTable.httpResult = 'Awaiting instructions'
+  propertyTable.pingResult = 'Awaiting instructions'
   propertyTable.loggedinResult = 'Not logged in'
 
   local apiCredentials =  {
     title = LOC "$$$/PhotoDeck/ExportDialog/Account=PhotoDeck Plugin API keys",
-    synopsis = LrView.bind 'httpResult',
+    synopsis = LrView.bind 'pingResult',
 
     f:row {
       bind_to_object = propertyTable,
@@ -135,33 +144,13 @@ function exportServiceProvider.sectionsForTopOfDialog( f, propertyTable )
           action = function()
             propertyTable = updateApiKeyAndSecret(propertyTable)
           end,
-        }
+        },
+        f:static_text {
+          title = LrView.bind 'pingResult',
+          alignment = 'right',
+          fill_horizontal = 1,
+        },
       },
-    },
-    f:row {
-      spacing = f:control_spacing(),
-
-      f:static_text {
-        title = LrView.bind 'httpResult',
-        alignment = 'right',
-        fill_horizontal = 1,
-        height_in_lines = 5,
-      },
-
-      f:push_button {
-        width = tonumber( LOC "$$$/locale_metric/PhotoDeck/ExportDialog/LoginButton/Width=90" ),
-        title = 'Ping',
-        enabled = true,
-        action = function()
-          propertyTable.httpResult = 'making api call'
-          PhotoDeckAPI.connect(propertyTable.apiKey, propertyTable.apiSecret)
-          LrTasks.startAsyncTask(function()
-            result, headers = PhotoDeckAPI.get('/ping.xml')
-            propertyTable.httpResult = result
-          end, 'PhotoDeckAPI Ping')
-        end,
-      },
-
     },
   }
   local userCredentials = {
