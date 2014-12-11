@@ -125,7 +125,9 @@ function PhotoDeckAPI.ping(text)
   if text then
     t = { text = text }
   end
-  return PhotoDeckAPI.get('/ping.xml', t)
+  local response, headers = PhotoDeckAPI.get('/ping.xml', t)
+  local xmltable = LrXml.xmlElementToSimpleTable(response)
+  return xmltable['message']['_value']
 end
 
 function PhotoDeckAPI.whoami()
@@ -140,10 +142,11 @@ end
 function PhotoDeckAPI:websites()
   local response, headers = PhotoDeckAPI.get('/websites.xml', { view = 'details' })
   local xmltable = LrXml.xmlElementToSimpleTable(response)['websites']['website']
+  -- logger:trace(printTable(xmltable))
   return {
     {
-      title = xmltable['name'],
-      value = xmltable['urlname'],
+      title = xmltable['title']['_value'],
+      value = xmltable['urlname']['_value'],
     }
   }
 end
