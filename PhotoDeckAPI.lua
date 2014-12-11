@@ -5,34 +5,17 @@ local LrHttp = import 'LrHttp'
 local LrTasks = import 'LrTasks'
 local LrStringUtils = import 'LrStringUtils'
 local LrXml = import 'LrXml'
-local TableUtils = require 'TableUtils'
-local TypeUtils = require 'TypeUtils'
+local PhotoDeckUtils = require 'PhotoDeckUtils'
 
 local logger = import 'LrLogger'( 'PhotoDeckAPI' )
 logger:enable('print')
 
 local urlprefix = 'http://api.photodeck.com'
-local isTable = TypeUtils.isTable
-local isString = TypeUtils.isString
+local isTable = PhotoDeckUtils.isTable
+local isString = PhotoDeckUtils.isString
+local printTable = PhotoDeckUtils.printTable
 
 local PhotoDeckAPI = {}
-
-local function printTable(t)
-  if isTable(t) then
-    local result = {}
-    for k, v in pairs(t) do
-      local current = ''
-      if isString(k) then
-        current = current .. k .. ' = '
-      end
-      table.insert(result, current .. printTable(v))
-    end
-    return '{ ' .. table.concat(result, ', ') .. '}'
-  else
-    return t
-  end
-end
-
 
 -- sign API request according to docs at
 -- http://www.photodeck.com/developers/get-started/
@@ -106,7 +89,7 @@ function PhotoDeckAPI.get(uri, data)
     PhotoDeckAPI.loggedin = false
   end
 
-  -- local hstring = TableUtils.toString(resp_headers)
+  -- local hstring = PhotoDeckUtils.printLrTable(resp_headers)
   -- logger:trace(hstring)
 
   return result
