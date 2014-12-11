@@ -8,6 +8,8 @@ local logger = import 'LrLogger'( 'PhotoDeckPublishServiceProvider' )
 logger:enable('print')
 
 local PhotoDeckAPI = require 'PhotoDeckAPI'
+local PhotoDeckUtils = require 'PhotoDeckUtils'
+local printTable = PhotoDeckUtils.printTable
 
 local exportServiceProvider = {}
 
@@ -86,6 +88,7 @@ local function getWebsites(propertyTable)
        propertyTable.apiSecret, propertyTable.username, propertyTable.password)
   LrTasks.startAsyncTask(function()
     propertyTable.websiteChoices = PhotoDeckAPI.websites()
+    logger:trace(printTable(propertyTable.websiteChoices))
   end, 'PhotoDeckAPI Get Websites')
 end
 
