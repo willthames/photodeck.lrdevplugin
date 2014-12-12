@@ -89,14 +89,12 @@ local function getWebsites(propertyTable)
        propertyTable.apiSecret, propertyTable.username, propertyTable.password)
   LrTasks.startAsyncTask(function()
     propertyTable.websiteChoices = PhotoDeckAPI.websites()
-    logger:trace(printTable(propertyTable.websiteChoices))
   end, 'PhotoDeckAPI Get Websites')
 end
 
 local function showGalleries(propertyTable)
   PhotoDeckAPI.connect(propertyTable.apiKey,
        propertyTable.apiSecret, propertyTable.username, propertyTable.password)
-  logger:trace(propertyTable.websiteChosen)
   LrTasks.startAsyncTask(function()
     PhotoDeckAPI.galleries(propertyTable.websiteChosen)
   end, 'PhotoDeckAPI Get Websites')

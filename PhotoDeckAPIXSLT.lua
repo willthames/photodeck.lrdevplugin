@@ -1,13 +1,15 @@
+local LrXml = import 'LrXml'
 local logger = import 'LrLogger'('PhotoDeckAPIXSLT')
 logger:enable('print')
 
 local xsltheader = [[
 <xsl:stylesheet version="1.0"
     xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
-   <xsl:output method="text"/>
+ <xsl:output method="text"/>
 ]]
 
 local xsltfooter = [[
+  <xsl:template match="request|query-string"/>
 </xsl:stylesheet>
 ]]
 
@@ -21,7 +23,6 @@ PhotoDeckAPIXSLT.whoami = xsltheader .. [[
   email = "<xsl:value-of select='email'/>",
 },
   </xsl:template>
-  <xsl:template match='/reply/request'/>
 ]] .. xsltfooter
 
 PhotoDeckAPIXSLT.websites = xsltheader .. [[
@@ -40,31 +41,29 @@ PhotoDeckAPIXSLT.websites = xsltheader .. [[
 
 PhotoDeckAPIXSLT.galleries = xsltheader .. [[
   <xsl:template match='/reply/galleries'>
+local t = {}
     <xsl:for-each select='gallery'>
-{ <xsl:value-of select='url-path'/> =
-  {
+t["<xsl:value-of select='url-path'/>"] = {
      fullurlpath = "<xsl:value-of select='full-url-path'/>",
      name = "<xsl:value-of select='name'/>",
      uuid = "<xsl:value-of select='uuid'/>",
      parentuuid = "<xsl:value-of select='parent-uuid'/>",
-  },
-},
-{ <xsl:value-of select='uuid'/> =
-  {
+}
+t["<xsl:value-of select='uuid'/>"] = {
      fullurlpath = "<xsl:value-of select='full-url-path'/>",
      name = "<xsl:value-of select='name'/>",
      urlpath = "<xsl:value-of select='url-path'/>",
      parentuuid = "<xsl:value-of select='parent-uuid'/>",
-  },
-},
-    </xsl:for-each>
+}
+   </xsl:for-each>
+return t
   </xsl:template>
 ]] .. xsltfooter
 
-PhotoDeckAPIXSLT.transform = function(xml, xslt)
+PhotoDeckAPIXSLT.transform = function(xmlstring, xslt)
+  local xml = LrXml.parseXml(xmlstring)
   local luastring = xml:transform(xslt)
-  logger:trace(luastring)
-  local f = assert(loadstring('return ' .. luastring))
+  local f = assert(loadstring(luastring))
   return f()
 end
 

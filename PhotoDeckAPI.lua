@@ -138,7 +138,7 @@ end
 function PhotoDeckAPI.galleries(urlname)
   local response, headers = PhotoDeckAPI.get('/websites/' .. urlname .. '/galleries.xml', { view = 'details' })
   local result = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.galleries)
-  logger:trace(result)
+  logger:trace(printTable(result))
   return result
 end
 return PhotoDeckAPI
