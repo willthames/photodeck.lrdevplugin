@@ -100,6 +100,15 @@ local function showGalleries(propertyTable)
   end, 'PhotoDeckAPI Get Websites')
 end
 
+local function showGalleries(propertyTable)
+  PhotoDeckAPI.connect(propertyTable.apiKey,
+       propertyTable.apiSecret, propertyTable.username, propertyTable.password)
+  logger:trace(propertyTable.websiteChosen)
+  LrTasks.startAsyncTask(function()
+    PhotoDeckAPI.galleries(propertyTable.websiteChosen)
+  end, 'PhotoDeckAPI Get Websites')
+end
+
 function exportServiceProvider.startDialog(propertyTable)
   propertyTable.loggedin = false
   if propertyTable.apiKey == '' or propertyTable.apiSecret == '' then
