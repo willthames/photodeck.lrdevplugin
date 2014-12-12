@@ -141,4 +141,19 @@ function PhotoDeckAPI.galleries(urlname)
   logger:trace(printTable(result))
   return result
 end
+
+function PhotoDeckAPI.createOrUpdatePhotoset( exportSettings, collectionInfo)
+end
+
+function PhotoDeckAPI.listPhotosFromPhotoset( exportSettings, t)
+  -- t = { photosetId = photosetId }
+end
+
+function PhotoDeckAPI.addPhotosToSet( exportSettings, t)
+end
+
+function PhotoDeckAPI.constructPhotoURL( exportSettings, t)
+  -- t = { photo_id = flickrPhotoId, is_public = is_public, }
+end
+
 return PhotoDeckAPI

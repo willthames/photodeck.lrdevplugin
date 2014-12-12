@@ -254,4 +254,163 @@ function exportServiceProvider.sectionsForTopOfDialog( f, propertyTable )
   }
 end
 
+
+function exportServiceProvider.processRenderedPhotos( functionContext, exportContext )
+
+  local exportSession = exportContext.exportSession
+  local exportSettings = assert( exportContext.propertyTable )
+  local nPhotos = exportSession:countRenditions()
+
+  -- Set progress title.
+  local progressScope = exportContext:configureProgress {
+    title = nPhotos > 1
+    and LOC( "$$$/PhotoDeck/Publish/Progress=Publishing ^1 photos to PhotoDeck", nPhotos )
+    or LOC "$$$/PhotoDeck/Publish/Progress/One=Publishing one photo to PhotoDeck",
+  }
+
+  -- Save off uploaded photo IDs so we can take user to those photos later.
+  local uploadedPhotoIds = {}
+  local publishedCollectionInfo = exportContext.publishedCollectionInfo
+  -- Look for a photoset id for this collection.
+  local photosetId = publishedCollectionInfo.remoteId
+  local photosetUrl
+  local photosetPhotoIds
+
+  -- If this isn't the Photostream, set up the photoset.
+  if not photosetId then
+    -- Create or update this photoset.
+    photosetId, photosetUrl = PhotoDeckAPI.createOrUpdatePhotoset( exportSettings, publishedCollectionInfo)
+  else
+    -- Get a list of photos already in this photoset so we know which ones we can replace and which have
+    -- to be re-uploaded entirely.
+    photosetPhotoIds = photosetId and PhotoDeckAPI.listPhotosFromPhotoset( exportSettings, { photosetId = photosetId } )
+  end
+
+  local photosetPhotosSet = {}
+
+  -- Turn it into a set for quicker access later.
+  if photosetPhotoIds then
+    for _, id in ipairs( photosetPhotoIds ) do
+      photosetPhotosSet[ id ] = true
+    end
+  end
+
+  local photodeckPhotoIdsForRenditions = {}
+
+  -- Gather photodeck photo IDs, and if we're on a free account, remember the renditions that
+  -- had been previously published.
+
+  for i, rendition in exportContext.exportSession:renditions() do
+    local photodeckPhotoId = rendition.publishedPhotoId
+    if photodeckPhotoId then
+      -- Check to see if the photo is still on PhotoDeck.
+      if not photosetPhotosSet[ photodeckPhotoId ] and not isDefaultCollection then
+        photodeckPhotoId = nil
+      end
+    end
+
+    photodeckPhotoIdsForRenditions[ rendition ] = photodeckPhotoId
+  end
+
+  -- Iterate through photo renditions.
+  for i, rendition in exportContext:renditions { stopIfCanceled = true } do
+    -- Update progress scope.
+    progressScope:setPortionComplete( ( i - 1 ) / nPhotos )
+    -- Get next photo.
+    local photo = rendition.photo
+
+    -- See if we previously uploaded this photo.
+    local photodeckPhotoId = photodeckPhotoIdsForRenditions[ rendition ]
+
+    if not rendition.wasSkipped then
+      local success, pathOrMessage = rendition:waitForRender()
+      -- Update progress scope again once we've got rendered photo.
+      progressScope:setPortionComplete( ( i - 0.5 ) / nPhotos )
+      -- Check for cancellation again after photo has been rendered.
+      if progressScope:isCanceled() then break end
+      if success then
+        -- Build up common metadata for this photo.
+        local title = getPhotoDeckTitle( photo, exportSettings, pathOrMessage )
+        local description = photo:getFormattedMetadata( 'caption' )
+        local keywordTags = photo:getFormattedMetadata( 'keywordTagsForExport' )
+        local tags
+
+        if keywordTags then
+          tags = {}
+          local keywordIter = string.gfind( keywordTags, "[^,]+" )
+          for keyword in keywordIter do
+            if string.sub( keyword, 1, 1 ) == ' ' then
+              keyword = string.sub( keyword, 2, -1 )
+            end
+
+            if string.find( keyword, ' ' ) ~= nil then
+              keyword = '"' .. keyword .. '"'
+            end
+
+            tags[ #tags + 1 ] = keyword
+          end
+        end
+
+        -- Upload or replace the photo.
+        photodeckPhotoId = PhotoDeckAPI.uploadPhoto( exportSettings, {
+          photo_id = photodeckPhotoId,
+          filePath = pathOrMessage,
+          title = title or '',
+          description = description,
+          tags = table.concat( tags, ',' ),
+        } )
+
+        -- When done with photo, delete temp file. There is a cleanup step that happens later,
+        -- but this will help manage space in the event of a large upload.
+        LrFileUtils.delete( pathOrMessage )
+
+        -- Remember this in the list of photos we uploaded.
+        uploadedPhotoIds[ #uploadedPhotoIds + 1 ] = photodeckPhotoId
+
+
+        -- Record this PhotoDeck ID with the photo so we know to replace instead of upload.
+        rendition:recordPublishedPhotoId( photodeckPhotoId )
+
+        local photoUrl
+
+        if ( not isDefaultCollection ) then
+
+          photoUrl = PhotoDeckAPI.constructPhotoURL( exportSettings, {
+            photo_id = photodeckPhotoId,
+            photosetId = photosetId,
+            is_public = is_public,
+          } )
+
+          -- Add the uploaded photos to the correct photoset.
+
+          PhotoDeckAPI.addPhotosToSet( exportSettings, {
+            photoId = photodeckPhotoId,
+            photosetId = photosetId,
+          } )
+
+        else
+
+          photoUrl = PhotoDeckAPI.constructPhotoURL( exportSettings, {
+            photo_id = photodeckPhotoId,
+            is_public = is_public,
+          } )
+
+        end
+
+        rendition:recordPublishedPhotoUrl( photoUrl )
+      end
+    end
+  end
+
+  if #uploadedPhotoIds > 0 then
+    if ( not isDefaultCollection ) then
+      exportSession:recordRemoteCollectionId( photosetId )
+    end
+    -- Set up some additional metadata for this collection.
+    exportSession:recordRemoteCollectionUrl( photosetUrl )
+  end
+  progressScope:done()
+
+end
+
 return exportServiceProvider
