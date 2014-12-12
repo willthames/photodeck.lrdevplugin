@@ -6,6 +6,7 @@ local LrTasks = import 'LrTasks'
 local LrStringUtils = import 'LrStringUtils'
 local LrXml = import 'LrXml'
 local PhotoDeckUtils = require 'PhotoDeckUtils'
+local PhotoDeckAPIXSLT = require 'PhotoDeckAPIXSLT'
 
 local logger = import 'LrLogger'( 'PhotoDeckAPI' )
 logger:enable('print')
@@ -122,7 +123,7 @@ function PhotoDeckAPI.whoami()
   }
 end
 
-function PhotoDeckAPI:websites()
+function PhotoDeckAPI.websites()
   local response, headers = PhotoDeckAPI.get('/websites.xml', { view = 'details' })
   local xmltable = LrXml.xmlElementToSimpleTable(response)['websites']['website']
   -- logger:trace(printTable(xmltable))
@@ -134,4 +135,10 @@ function PhotoDeckAPI:websites()
   }
 end
 
+function PhotoDeckAPI.galleries(urlname)
+  local response, headers = PhotoDeckAPI.get('/websites/' .. urlname .. '/galleries.xml', { view = 'details' })
+  local result = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.galleries)
+  logger:trace(result)
+  return result
+end
 return PhotoDeckAPI
