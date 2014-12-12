@@ -1,4 +1,5 @@
 -- local LrMobdebug = import 'LrMobdebug'
+local LrBinding = import 'LrBinding'
 local LrDialogs = import 'LrDialogs'
 local LrView = import 'LrView'
 local LrTasks = import 'LrTasks'
@@ -89,6 +90,15 @@ local function getWebsites(propertyTable)
   LrTasks.startAsyncTask(function()
     propertyTable.websiteChoices = PhotoDeckAPI.websites()
     logger:trace(printTable(propertyTable.websiteChoices))
+  end, 'PhotoDeckAPI Get Websites')
+end
+
+local function showGalleries(propertyTable)
+  PhotoDeckAPI.connect(propertyTable.apiKey,
+       propertyTable.apiSecret, propertyTable.username, propertyTable.password)
+  logger:trace(propertyTable.websiteChosen)
+  LrTasks.startAsyncTask(function()
+    PhotoDeckAPI.galleries(propertyTable.websiteChosen)
   end, 'PhotoDeckAPI Get Websites')
 end
 
@@ -190,7 +200,7 @@ function exportServiceProvider.sectionsForTopOfDialog( f, propertyTable )
       f:push_button {
         width = tonumber( LOC "$$$/locale_metric/PhotoDeck/ExportDialog/TestButton/Width=90" ),
         title = 'Login',
-        enabled = LrView.bind 'loggedin',
+        enabled = LrBinding.negativeOfKey('loggedin'),
         action = function () login(propertyTable) end
       },
 
@@ -217,8 +227,14 @@ function exportServiceProvider.sectionsForTopOfDialog( f, propertyTable )
       },
 
       f:popup_menu {
+        title = "Select Website",
         items = LrView.bind 'websiteChoices',
         value = LrView.bind 'websiteChosen',
+      },
+      f:push_button {
+        enabled = true,
+        title = 'Show galleries',
+        action = function () showGalleries(propertyTable) end
       }
 
     }
