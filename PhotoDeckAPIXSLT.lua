@@ -60,6 +60,16 @@ return t
   </xsl:template>
 ]] .. xsltfooter
 
+PhotoDeckAPIXSLT.galleryPhotos = xsltheader .. [[
+  <xsl:template match='/reply/gallery/medias'>
+return {
+    <xsl:for-each select='media'>
+    "<xsl:value-of select='uuid'/>",
+   </xsl:for-each>
+}
+  </xsl:template>
+]] .. xsltfooter
+
 PhotoDeckAPIXSLT.transform = function(xmlstring, xslt)
   local xml = LrXml.parseXml(xmlstring)
   local luastring = xml:transform(xslt)

@@ -27,7 +27,7 @@ exportServiceProvider.exportPresetFields = {
   { key = 'fullname', default = "" },
   { key = 'apiKey', default = "" },
   { key = 'apiSecret', default = "" },
-  { key = 'website', default = "" },
+  { key = 'websiteChosen', default = "" },
 }
 
 local function  updateApiKeyAndSecret(propertyTable)
@@ -89,23 +89,6 @@ local function getWebsites(propertyTable)
        propertyTable.apiSecret, propertyTable.username, propertyTable.password)
   LrTasks.startAsyncTask(function()
     propertyTable.websiteChoices = PhotoDeckAPI.websites()
-  end, 'PhotoDeckAPI Get Websites')
-end
-
-local function showGalleries(propertyTable)
-  PhotoDeckAPI.connect(propertyTable.apiKey,
-       propertyTable.apiSecret, propertyTable.username, propertyTable.password)
-  LrTasks.startAsyncTask(function()
-    PhotoDeckAPI.galleries(propertyTable.websiteChosen)
-  end, 'PhotoDeckAPI Get Websites')
-end
-
-local function showGalleries(propertyTable)
-  PhotoDeckAPI.connect(propertyTable.apiKey,
-       propertyTable.apiSecret, propertyTable.username, propertyTable.password)
-  logger:trace(propertyTable.websiteChosen)
-  LrTasks.startAsyncTask(function()
-    PhotoDeckAPI.galleries(propertyTable.websiteChosen)
   end, 'PhotoDeckAPI Get Websites')
 end
 
@@ -260,6 +243,8 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
   local exportSession = exportContext.exportSession
   local exportSettings = assert( exportContext.propertyTable )
   local nPhotos = exportSession:countRenditions()
+  PhotoDeckAPI.connect(exportSettings.apiKey,
+       exportSettings.apiSecret, exportSettings.username, exportSettings.password)
 
   -- Set progress title.
   local progressScope = exportContext:configureProgress {
@@ -271,29 +256,26 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
   -- Save off uploaded photo IDs so we can take user to those photos later.
   local uploadedPhotoIds = {}
   local publishedCollectionInfo = exportContext.publishedCollectionInfo
-  -- Look for a photoset id for this collection.
-  local photosetId = publishedCollectionInfo.remoteId
-  local photosetUrl
-  local photosetPhotoIds
+  -- Look for a gallery id for this collection.
+  local galleryId = publishedCollectionInfo.remoteId
+  local galleryPhotos
+  local gallery
+  local urlname = exportSettings.websiteChosen
 
-  -- If this isn't the Photostream, set up the photoset.
-  if not photosetId then
-    -- Create or update this photoset.
-    photosetId, photosetUrl = PhotoDeckAPI.createOrUpdatePhotoset( exportSettings, publishedCollectionInfo)
+  if not galleryId then
+    -- Create or update this gallery.
+    gallery = PhotoDeckAPI.createOrUpdateGallery(exportSettings, publishedCollectionInfo)
   else
-    -- Get a list of photos already in this photoset so we know which ones we can replace and which have
+    -- Get a list of photos already in this gallery so we know which ones we can replace and which have
     -- to be re-uploaded entirely.
-    photosetPhotoIds = photosetId and PhotoDeckAPI.listPhotosFromPhotoset( exportSettings, { photosetId = photosetId } )
+    galleries = PhotoDeckAPI.galleries(urlname)
+    gallery = galleries[galleryId]
+    galleryPhotos = PhotoDeckAPI.photosInGallery(exportSettings, gallery)
   end
-
-  local photosetPhotosSet = {}
-
-  -- Turn it into a set for quicker access later.
-  if photosetPhotoIds then
-    for _, id in ipairs( photosetPhotoIds ) do
-      photosetPhotosSet[ id ] = true
-    end
-  end
+  exportSession:recordRemoteCollectionId(gallery.uuid)
+  local website = exportSettings.websites[urlname]
+  gallery.fullurl = website.homeurl .. "/-/" .. gallery.urlinfo
+  exportSession:recordRemoteCollectionUrl(gallery.fullurl)
 
   local photodeckPhotoIdsForRenditions = {}
 
@@ -304,7 +286,7 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
     local photodeckPhotoId = rendition.publishedPhotoId
     if photodeckPhotoId then
       -- Check to see if the photo is still on PhotoDeck.
-      if not photosetPhotosSet[ photodeckPhotoId ] and not isDefaultCollection then
+      if not galleryPhotos[ photodeckPhotoId ] then
         photodeckPhotoId = nil
       end
     end
@@ -333,10 +315,9 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
         local title = getPhotoDeckTitle( photo, exportSettings, pathOrMessage )
         local description = photo:getFormattedMetadata( 'caption' )
         local keywordTags = photo:getFormattedMetadata( 'keywordTagsForExport' )
-        local tags
+        local tags = {}
 
         if keywordTags then
-          tags = {}
           local keywordIter = string.gfind( keywordTags, "[^,]+" )
           for keyword in keywordIter do
             if string.sub( keyword, 1, 1 ) == ' ' then
@@ -352,63 +333,38 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
         end
 
         -- Upload or replace the photo.
-        photodeckPhotoId = PhotoDeckAPI.uploadPhoto( exportSettings, {
-          photo_id = photodeckPhotoId,
-          filePath = pathOrMessage,
+        local upload
+        if not photodeckPhotoId then
+          upload = PhotoDeckAPI.uploadPhoto( exportSettings, {
+            filePath = pathOrMessage,
+            gallery = gallery.uuid,
+          } )
+        else
+          upload = PhotoDeckAPI.getPhoto(exportSettings, photodeckPhotoId)
+        end
+        PhotoDeckAPI.updatePhoto(exportSettings, {
+          photo_id = upload.uuid,
           title = title or '',
           description = description,
           tags = table.concat( tags, ',' ),
-        } )
+        })
+
 
         -- When done with photo, delete temp file. There is a cleanup step that happens later,
         -- but this will help manage space in the event of a large upload.
         LrFileUtils.delete( pathOrMessage )
 
         -- Remember this in the list of photos we uploaded.
-        uploadedPhotoIds[ #uploadedPhotoIds + 1 ] = photodeckPhotoId
-
+        uploadedPhotoIds[ #uploadedPhotoIds + 1 ] = upload.uuid
 
         -- Record this PhotoDeck ID with the photo so we know to replace instead of upload.
-        rendition:recordPublishedPhotoId( photodeckPhotoId )
-
-        local photoUrl
-
-        if ( not isDefaultCollection ) then
-
-          photoUrl = PhotoDeckAPI.constructPhotoURL( exportSettings, {
-            photo_id = photodeckPhotoId,
-            photosetId = photosetId,
-            is_public = is_public,
-          } )
-
-          -- Add the uploaded photos to the correct photoset.
-
-          PhotoDeckAPI.addPhotosToSet( exportSettings, {
-            photoId = photodeckPhotoId,
-            photosetId = photosetId,
-          } )
-
-        else
-
-          photoUrl = PhotoDeckAPI.constructPhotoURL( exportSettings, {
-            photo_id = photodeckPhotoId,
-            is_public = is_public,
-          } )
-
-        end
-
-        rendition:recordPublishedPhotoUrl( photoUrl )
+        rendition:recordPublishedPhotoId( upload.uuid )
+        -- Add the uploaded photos to the correct gallery.
+        rendition:recordPublishedPhotoUrl( upload.url )
       end
     end
   end
 
-  if #uploadedPhotoIds > 0 then
-    if ( not isDefaultCollection ) then
-      exportSession:recordRemoteCollectionId( photosetId )
-    end
-    -- Set up some additional metadata for this collection.
-    exportSession:recordRemoteCollectionUrl( photosetUrl )
-  end
   progressScope:done()
 
 end

@@ -40,7 +40,7 @@ end
 -- convert lua table to url encoded data
 -- from http://www.lua.org/pil/20.3.html
 local function table_to_querystring(data)
-  assert(data, isString)
+  assert(PhotoDeckUtils.isTable(data))
   local function escape (s)
     s = string.gsub(s, "([&=+%c])", function (c)
            return string.format("%%%02X", string.byte(c))
@@ -96,6 +96,22 @@ function PhotoDeckAPI.get(uri, data)
   return result
 end
 
+function PhotoDeckAPI.post(method, uri, data)
+  -- sign request
+  local headers = sign('POST', uri)
+  -- set login cookies
+  if PhotoDeckAPI.username and PhotoDeckAPI.password and not PhotoDeckAPI.loggedin then
+    local authorization = 'Basic ' .. LrStringUtils.encodeBase64(PhotoDeckAPI.username ..
+                                                             ':' .. PhotoDeckAPI.password)
+    table.insert(headers, { field = 'Authorization',  value=authorization })
+  end
+  logger:trace(printTable(data))
+  local body = table_to_querystring(data)
+  logger:trace(printTable(body))
+  local result, resp_headers = LrHttp.post(urlprefix .. uri, headers, body)
+  return result
+end
+
 function PhotoDeckAPI.connect(key, secret, username, password)
   PhotoDeckAPI.key = key
   PhotoDeckAPI.secret = secret
@@ -138,22 +154,75 @@ end
 function PhotoDeckAPI.galleries(urlname)
   local response, headers = PhotoDeckAPI.get('/websites/' .. urlname .. '/galleries.xml', { view = 'details' })
   local result = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.galleries)
-  logger:trace(printTable(result))
+  -- logger:trace(printTable(result))
   return result
 end
 
-function PhotoDeckAPI.createOrUpdatePhotoset( exportSettings, collectionInfo)
+function PhotoDeckAPI.createGallery(urlname, galleryname, parentId)
+  local galleryInfo = {}
+  galleryInfo['gallery[name]'] = galleryname
+  galleryInfo['gallery[parent]'] = parentId
+  logger:trace(printTable(galleryInfo))
+  PhotoDeckAPI.post('/websites/' .. urlname .. '/galleries.xml', galleryInfo)
+  local galleries = PhotoDeckAPI.galleries(urlname)
+  return galleries[galleryname]
 end
 
-function PhotoDeckAPI.listPhotosFromPhotoset( exportSettings, t)
-  -- t = { photosetId = photosetId }
+function PhotoDeckAPI.createOrUpdateGallery(exportSettings, collectionInfo)
+  local urlname = exportSettings.websiteChosen
+  local galleries = PhotoDeckAPI.galleries(urlname)
+  local gallery
+  logger:trace(printTable(collectionInfo))
+  -- TODO update gallery
+  if galleries[collectionInfo.name] then
+    gallery = galleries[collectionInfo.name]
+  else
+    -- no idea how to deal with multiple parents as yet
+    assert(#collectionInfo.parents < 2)
+    local parentgallery
+    for _, parent in pairs(collectionInfo.parents) do
+      if not galleries[parent.remoteCollectionId] then
+        parentgallery = PhotoDeckAPI.createGallery(urlname, parent.name,
+            galleries["galleries"].uuid)
+      end
+    end
+    gallery = PhotoDeckAPI.createGallery(urlname, collectionInfo.name, parentgallery.uuid)
+  end
+  return gallery
 end
 
-function PhotoDeckAPI.addPhotosToSet( exportSettings, t)
+function PhotoDeckAPI.photosInGallery(exportSettings, gallery)
+  local url = '/websites/' .. exportSettings.websiteChosen .. '/galleries/' .. gallery.uuid .. '.xml'
+  local response, headers = PhotoDeckAPI.get(url, { view = 'details_with_medias' })
+  local medias = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.galleries)
+  logger:trace(printTable(medias))
+  -- turn it into a set for ease of testing inclusion
+  local mediaSet = {}
+  for _, v in pairs(medias) do
+    mediaSet[v] = v
+  end
+  return medias
 end
 
-function PhotoDeckAPI.constructPhotoURL( exportSettings, t)
-  -- t = { photo_id = flickrPhotoId, is_public = is_public, }
+function PhotoDeckAPI.uploadPhoto( exportSettings, t)
+  -- sign request
+  local headers = sign('POST', '/medias.xml')
+  -- set login cookies
+  if PhotoDeckAPI.username and PhotoDeckAPI.password and not PhotoDeckAPI.loggedin then
+    local authorization = 'Basic ' .. LrStringUtils.encodeBase64(PhotoDeckAPI.username ..
+                                                             ':' .. PhotoDeckAPI.password)
+    table.insert(headers, { field = 'Authorization',  value=authorization })
+  end
+  local content = {
+    { name = 'media[publish_to_galleries]', value = t.gallery },
+    { name = 'media[replace]', value = not not t.photo_id },
+    { name = 'media[content]', filePath = t.filePath, fileName = t.title, contentType = 'image/jpeg' },
+  }
+  local response, resp_headers = LrHttp.postMultipart(urlprefix .. '/medias.xml', content, headers)
+  local xmltable = LrXml.xmlElementToSimpleTable(response)['media']
+
+  local website = exportSettings.websites[exportSettings.websiteChosen]
+  return { uuid = xmltable.uuid, url = website.homeurl .. "/-/" .. xmltable.url }
 end
 
 return PhotoDeckAPI
