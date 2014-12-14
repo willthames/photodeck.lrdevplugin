@@ -16,6 +16,24 @@ function PhotoDeckUtils.isTable(v)
   return PhotoDeckUtils.isType(v, 'table')
 end
 
+function PhotoDeckUtils.isFunction(v)
+  return PhotoDeckUtils.isType(v, 'function')
+end
+
+function PhotoDeckUtils.isBoolean(v)
+  return PhotoDeckUtils.isType(v, 'boolean')
+end
+
+function PhotoDeckUtils.toString(v)
+  if PhotoDeckUtils.isBoolean(v) then
+    return v and 'true' or 'false'
+  end
+  if PhotoDeckUtils.isFunction(v) then
+    return 'function'
+  end
+  return v
+end
+
 function PhotoDeckUtils.printTable(t)
   if PhotoDeckUtils.isTable(t) then
     local result = {}
@@ -28,7 +46,7 @@ function PhotoDeckUtils.printTable(t)
     end
     return '{ ' .. table.concat(result, ', ') .. ' }'
   else
-    return t
+    return PhotoDeckUtils.toString(t)
   end
 end
 
