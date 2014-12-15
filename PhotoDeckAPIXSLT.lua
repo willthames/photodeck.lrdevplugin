@@ -43,7 +43,7 @@ PhotoDeckAPIXSLT.galleries = xsltheader .. [[
   <xsl:template match='/reply/galleries'>
 local t = {}
     <xsl:for-each select='gallery'>
-t["<xsl:value-of select='url-path'/>"] = {
+t["<xsl:value-of select='name'/>"] = {
      fullurlpath = "<xsl:value-of select='full-url-path'/>",
      name = "<xsl:value-of select='name'/>",
      uuid = "<xsl:value-of select='uuid'/>",
@@ -60,7 +60,7 @@ return t
   </xsl:template>
 ]] .. xsltfooter
 
-PhotoDeckAPIXSLT.galleryPhotos = xsltheader .. [[
+PhotoDeckAPIXSLT.photosInGallery = xsltheader .. [[
   <xsl:template match='/reply/gallery/medias'>
 return {
     <xsl:for-each select='media'>
@@ -73,6 +73,7 @@ return {
 PhotoDeckAPIXSLT.transform = function(xmlstring, xslt)
   local xml = LrXml.parseXml(xmlstring)
   local luastring = xml:transform(xslt)
+  logger:trace(luastring)
   local f = assert(loadstring(luastring))
   return f()
 end

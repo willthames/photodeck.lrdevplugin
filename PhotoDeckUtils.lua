@@ -62,7 +62,11 @@ function PhotoDeckUtils.filter(t, p)
   local result = {}
   for k, v in pairs(t) do
     if p(v) then
-      result[k] = v
+      if PhotoDeckUtils.isNumber(k) then
+        table.insert(result, v)
+      else
+        result[k] = v
+      end
     end
   end
   return result
