@@ -17,24 +17,26 @@ local PhotoDeckAPIXSLT = {}
 
 PhotoDeckAPIXSLT.whoami = xsltheader .. [[
   <xsl:template match='/reply/user'>
-{
+local t = {
   firstname = "<xsl:value-of select='firstname'/>",
   lastname = "<xsl:value-of select='lastname'/>",
   email = "<xsl:value-of select='email'/>",
-},
+}
+return t
   </xsl:template>
 ]] .. xsltfooter
 
 PhotoDeckAPIXSLT.websites = xsltheader .. [[
   <xsl:template match='/reply/websites'>
     <xsl:for-each select='website'>
-{ <xsl:value-of select='urlname'/> =
+local t = { <xsl:value-of select='urlname'/> =
   {
      hostname = "<xsl:value-of select='hostname'/>",
-     hosturl = "<xsl:value-of select='host-url'/>",
+     homeurl = "<xsl:value-of select='home-url'/>",
      title = "<xsl:value-of select='title'/>",
   },
-},
+}
+return t
     </xsl:for-each>
   </xsl:template>
 ]] .. xsltfooter
@@ -47,11 +49,13 @@ t["<xsl:value-of select='name'/>"] = {
      fullurlpath = "<xsl:value-of select='full-url-path'/>",
      name = "<xsl:value-of select='name'/>",
      uuid = "<xsl:value-of select='uuid'/>",
+     urlpath = "<xsl:value-of select='url-path'/>",
      parentuuid = "<xsl:value-of select='parent-uuid'/>",
 }
 t["<xsl:value-of select='uuid'/>"] = {
      fullurlpath = "<xsl:value-of select='full-url-path'/>",
      name = "<xsl:value-of select='name'/>",
+     uuid = "<xsl:value-of select='uuid'/>",
      urlpath = "<xsl:value-of select='url-path'/>",
      parentuuid = "<xsl:value-of select='parent-uuid'/>",
 }
@@ -62,12 +66,14 @@ return t
 
 PhotoDeckAPIXSLT.photosInGallery = xsltheader .. [[
   <xsl:template match='/reply/gallery/medias'>
-return {
+local t = {
     <xsl:for-each select='media'>
     "<xsl:value-of select='uuid'/>",
    </xsl:for-each>
 }
+return t
   </xsl:template>
+  <xsl:template match='/reply/gallery/*'/>
 ]] .. xsltfooter
 
 PhotoDeckAPIXSLT.transform = function(xmlstring, xslt)
