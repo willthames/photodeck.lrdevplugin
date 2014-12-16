@@ -132,23 +132,16 @@ end
 
 function PhotoDeckAPI.whoami()
   local response, headers = PhotoDeckAPI.request('GET', '/whoami.xml')
-  local xmltable = LrXml.xmlElementToSimpleTable(response)
-  return {
-    firstname = xmltable['user']['firstname']['_value'],
-    lastname = xmltable['user']['lastname']['_value'],
-  }
+  local result = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.whoami)
+  -- logger:trace(printTable(result))
+  return result
 end
 
 function PhotoDeckAPI.websites()
   local response, headers = PhotoDeckAPI.request('GET', '/websites.xml', { view = 'details' })
-  local xmltable = LrXml.xmlElementToSimpleTable(response)['websites']['website']
-  -- logger:trace(printTable(xmltable))
-  return {
-    {
-      title = xmltable['title']['_value'],
-      value = xmltable['urlname']['_value'],
-    }
-  }
+  local result = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.websites)
+  logger:trace(printTable(result))
+  return result
 end
 
 function PhotoDeckAPI.galleries(urlname)
@@ -162,7 +155,6 @@ function PhotoDeckAPI.createGallery(urlname, galleryname, parentId)
   local galleryInfo = {}
   galleryInfo['gallery[name]'] = galleryname
   galleryInfo['gallery[parent]'] = parentId
-  logger:trace(printTable(galleryInfo))
   PhotoDeckAPI.request('POST', '/websites/' .. urlname .. '/galleries.xml', galleryInfo)
   local galleries = PhotoDeckAPI.galleries(urlname)
   return galleries[galleryname]

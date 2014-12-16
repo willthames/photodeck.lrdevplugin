@@ -88,7 +88,12 @@ local function getWebsites(propertyTable)
   PhotoDeckAPI.connect(propertyTable.apiKey,
        propertyTable.apiSecret, propertyTable.username, propertyTable.password)
   LrTasks.startAsyncTask(function()
-    propertyTable.websiteChoices = PhotoDeckAPI.websites()
+    propertyTable.websites = PhotoDeckAPI.websites()
+    propertyTable.websiteChoices = {}
+    for k, v in pairs(propertyTable.websites) do
+      table.insert(propertyTable.websiteChoices, { title = v.title, value = k })
+    end
+    logger:trace(printTable(propertyTable.websiteChoices))
   end, 'PhotoDeckAPI Get Websites')
 end
 
@@ -210,10 +215,8 @@ function exportServiceProvider.sectionsForTopOfDialog( f, propertyTable )
     f:row {
       bind_to_object = propertyTable,
 
-      f:push_button {
-        enabled = true,
-        title = 'Get websites',
-        action = function () getWebsites(propertyTable) end
+      f:static_text {
+        title = 'Choose website',
       },
 
       f:popup_menu {
@@ -221,11 +224,6 @@ function exportServiceProvider.sectionsForTopOfDialog( f, propertyTable )
         items = LrView.bind 'websiteChoices',
         value = LrView.bind 'websiteChosen',
       },
-      f:push_button {
-        enabled = true,
-        title = 'Show galleries',
-        action = function () showGalleries(propertyTable) end
-      }
 
     }
   }
