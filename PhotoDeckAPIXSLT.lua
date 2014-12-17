@@ -76,6 +76,24 @@ return t
   <xsl:template match='/reply/gallery/*'/>
 ]] .. xsltfooter
 
+PhotoDeckAPIXSLT.uploadPhoto = xsltheader .. [[
+  <xsl:template match='/reply/media'>
+local t = {
+  uuid =  "<xsl:value-of select='uuid'/>",
+  path =  "<xsl:value-of select='url'/>",
+}
+return t
+  </xsl:template>
+  <xsl:template match='/reply'>
+local t = { 
+  uuid = "<xsl:value-of select='media-uuid'/>",
+  path = "<xsl:value-of select='location'/>",
+}
+return t
+  </xsl:template>
+]] .. xsltfooter
+
+
 PhotoDeckAPIXSLT.transform = function(xmlstring, xslt)
   local xml = LrXml.parseXml(xmlstring)
   local luastring = xml:transform(xslt)
