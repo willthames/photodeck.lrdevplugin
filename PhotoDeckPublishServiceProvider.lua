@@ -1,8 +1,9 @@
 -- local LrMobdebug = import 'LrMobdebug'
 local LrBinding = import 'LrBinding'
 local LrDialogs = import 'LrDialogs'
-local LrView = import 'LrView'
+local LrFileUtils = import 'LrFileUtils'
 local LrTasks = import 'LrTasks'
+local LrView = import 'LrView'
 
 local logger = import 'LrLogger'( 'PhotoDeckPublishServiceProvider' )
 
@@ -28,6 +29,7 @@ exportServiceProvider.exportPresetFields = {
   { key = 'apiKey', default = "" },
   { key = 'apiSecret', default = "" },
   { key = 'websiteChosen', default = "" },
+  { key = 'websites', default = {} },
 }
 
 local function  updateApiKeyAndSecret(propertyTable)
@@ -94,6 +96,7 @@ local function getWebsites(propertyTable)
       table.insert(propertyTable.websiteChoices, { title = v.title, value = k })
     end
     logger:trace(printTable(propertyTable.websiteChoices))
+    logger:trace(printTable(propertyTable.websites))
   end, 'PhotoDeckAPI Get Websites')
 end
 
@@ -266,13 +269,13 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
   else
     -- Get a list of photos already in this gallery so we know which ones we can replace and which have
     -- to be re-uploaded entirely.
-    galleries = PhotoDeckAPI.galleries(urlname)
+    local galleries = PhotoDeckAPI.galleries(urlname)
     gallery = galleries[galleryId]
     galleryPhotos = PhotoDeckAPI.photosInGallery(exportSettings, gallery)
   end
   exportSession:recordRemoteCollectionId(gallery.uuid)
-  local website = exportSettings.websites[urlname]
-  gallery.fullurl = website.homeurl .. "/-/" .. gallery.urlinfo
+  local website = PhotoDeckAPI.websites()[urlname]
+  gallery.fullurl = website.homeurl .. "/-/" .. gallery.urlpath
   exportSession:recordRemoteCollectionUrl(gallery.fullurl)
 
   local photodeckPhotoIdsForRenditions = {}
@@ -310,7 +313,6 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
       if progressScope:isCanceled() then break end
       if success then
         -- Build up common metadata for this photo.
-        local title = getPhotoDeckTitle( photo, exportSettings, pathOrMessage )
         local description = photo:getFormattedMetadata( 'caption' )
         local keywordTags = photo:getFormattedMetadata( 'keywordTagsForExport' )
         local tags = {}
@@ -340,13 +342,14 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
         else
           upload = PhotoDeckAPI.getPhoto(exportSettings, photodeckPhotoId)
         end
-        PhotoDeckAPI.updatePhoto(exportSettings, {
-          photo_id = upload.uuid,
-          title = title or '',
+
+        -- Use the below code once we know what we want to update
+        --[[
+        PhotoDeckAPI.updatePhoto(exportSettings, upload, {
           description = description,
           tags = table.concat( tags, ',' ),
         })
-
+        --]]
 
         -- When done with photo, delete temp file. There is a cleanup step that happens later,
         -- but this will help manage space in the event of a large upload.

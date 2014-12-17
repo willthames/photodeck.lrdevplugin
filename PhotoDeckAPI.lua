@@ -22,6 +22,7 @@ local PhotoDeckAPI = {}
 -- sign API request according to docs at
 -- http://www.photodeck.com/developers/get-started/
 local function sign(method, uri, querystring)
+  querystring = querystring or ''
   local cocoatime = LrDate.currentTime()
   -- cocoatime = cocoatime - (cocoatime % 600)
   -- Fri, 25 Jun 2010 12:39:15 +0200
@@ -70,6 +71,15 @@ local function table_to_querystring(data)
   return string.sub(s, 2)     -- remove first `&'
 end
 
+local function handle_errors(response, resp_headers)
+  local status = PhotoDeckUtils.filter(resp_headers, function(v) return isTable(v) and v.field == 'Status' end)[1]
+
+  if status.value > "400" then
+    logger:error("Bad response: " .. response)
+    logger:error(PhotoDeckUtils.printLrTable(resp_headers))
+    -- raise this up to the user at this point?
+  end
+end
 
 -- make HTTP GET request to PhotoDeck API
 -- must be called within an LrTask
@@ -88,7 +98,7 @@ function PhotoDeckAPI.request(method, uri, data)
   local headers = auth_headers(method, uri, querystring)
   -- build full url
   local fullurl = urlprefix .. uri
-  if not (querystring == '') then
+  if querystring and querystring ~= '' then
     fullurl = fullurl .. '?' .. querystring
   end
 
@@ -102,12 +112,7 @@ function PhotoDeckAPI.request(method, uri, data)
     result, resp_headers = LrHttp.post(fullurl, body, headers, method)
   end
 
-  local status = PhotoDeckUtils.filter(resp_headers, function(v) return isTable(v) and v.field == 'Status' end)[1]
-  if status.value > "400" then
-    logger:error("Bad response: " .. result)
-    logger:error(PhotoDeckUtils.printLrTable(resp_headers))
-    -- raise this up to the user at this point?
-  end
+  handle_errors(result, resp_headers)
 
   return result
 end
@@ -140,7 +145,7 @@ end
 function PhotoDeckAPI.websites()
   local response, headers = PhotoDeckAPI.request('GET', '/websites.xml', { view = 'details' })
   local result = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.websites)
-  logger:trace(printTable(result))
+  -- logger:trace(printTable(result))
   return result
 end
 
@@ -186,7 +191,7 @@ function PhotoDeckAPI.photosInGallery(exportSettings, gallery)
   local url = '/websites/' .. exportSettings.websiteChosen .. '/galleries/' .. gallery.uuid .. '.xml'
   local response, headers = PhotoDeckAPI.request('GET', url, { view = 'details_with_medias' })
   local medias = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.photosInGallery)
-  logger:trace(printTable(medias))
+  -- logger:trace(printTable(medias))
   -- turn it into a set for ease of testing inclusion
   local mediaSet = {}
   for _, v in pairs(medias) do
@@ -200,14 +205,34 @@ function PhotoDeckAPI.uploadPhoto( exportSettings, t)
   local headers = auth_headers('POST', '/medias.xml')
   local content = {
     { name = 'media[publish_to_galleries]', value = t.gallery },
-    { name = 'media[replace]', value = not not t.photo_id },
-    { name = 'media[content]', filePath = t.filePath, fileName = t.title, contentType = 'image/jpeg' },
+    { name = 'media[replace]', value = PhotoDeckUtils.toString(not not t.photo_id) },
+    { name = 'media[content]', filePath = t.filePath, fileName = t.filePath, contentType = 'image/jpeg' },
   }
+  logger:trace(printTable(content))
   local response, resp_headers = LrHttp.postMultipart(urlprefix .. '/medias.xml', content, headers)
-  local xmltable = LrXml.xmlElementToSimpleTable(response)['media']
-
+  handle_errors(response, resp_headers)
+  local media = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.uploadPhoto)
+  logger:trace(printTable(media))
   local website = exportSettings.websites[exportSettings.websiteChosen]
-  return { uuid = xmltable.uuid, url = website.homeurl .. "/-/" .. xmltable.url }
+  media.url = website.homeurl .. "/-/" .. media.path
+
+  return media
+end
+
+function PhotoDeckAPI.updatePhoto(exportSettings, uuid, t)
+  -- set up authorisation headers request
+  local headers = auth_headers('POST', '/medias/' .. uuid .. '.xml')
+  local content = {}
+  for k, v in pairs(t) do
+    if k == 'content' then
+      table.insert(content, { name = 'media[content]', filePath = t.content,
+                              fileName = t.content, contentType = 'image/jpeg' })
+    else
+      table.insert(content, { name = 'media[' .. k .. ']', value = v})
+    end
+  end
+  response, resp_headers = LrHttp.postMultipart(urlprefix .. '/medias/' .. uuid .. '.xml', content, headers)
+  handle_errors(response, resp_headers)
 end
 
 return PhotoDeckAPI
