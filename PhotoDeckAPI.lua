@@ -191,21 +191,21 @@ function PhotoDeckAPI.photosInGallery(exportSettings, gallery)
   local url = '/websites/' .. exportSettings.websiteChosen .. '/galleries/' .. gallery.uuid .. '.xml'
   local response, headers = PhotoDeckAPI.request('GET', url, { view = 'details_with_medias' })
   local medias = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.photosInGallery)
-  -- logger:trace(printTable(medias))
   -- turn it into a set for ease of testing inclusion
   local mediaSet = {}
   for _, v in pairs(medias) do
     mediaSet[v] = v
   end
-  return medias
+  logger:trace(printTable(mediaSet))
+  return mediaSet
 end
 
 function PhotoDeckAPI.uploadPhoto( exportSettings, t)
   -- set up authorisation headers request
   local headers = auth_headers('POST', '/medias.xml')
   local content = {
-    { name = 'media[publish_to_galleries]', value = t.gallery },
-    { name = 'media[replace]', value = PhotoDeckUtils.toString(not not t.photo_id) },
+    { name = 'media[publish_to_galleries]', value = t.gallery.uuid },
+    { name = 'media[replace]', value = PhotoDeckUtils.toString(t.replace) },
     { name = 'media[content]', filePath = t.filePath, fileName = t.filePath, contentType = 'image/jpeg' },
   }
   logger:trace(printTable(content))
@@ -213,8 +213,7 @@ function PhotoDeckAPI.uploadPhoto( exportSettings, t)
   handle_errors(response, resp_headers)
   local media = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.uploadPhoto)
   logger:trace(printTable(media))
-  local website = exportSettings.websites[exportSettings.websiteChosen]
-  media.url = website.homeurl .. "/-/" .. media.path
+  media.url = t.gallery.fullurl .. "/-/" .. media.path
 
   return media
 end
@@ -233,6 +232,11 @@ function PhotoDeckAPI.updatePhoto(exportSettings, uuid, t)
   end
   response, resp_headers = LrHttp.postMultipart(urlprefix .. '/medias/' .. uuid .. '.xml', content, headers)
   handle_errors(response, resp_headers)
+end
+
+function PhotoDeckAPI.deletePhoto(publishSettings, photoId)
+  response, resp_headers = PhotoDeckAPI.request('DELETE', '/medias/' .. photoId .. '.xml')
+  logger:trace(response)
 end
 
 return PhotoDeckAPI

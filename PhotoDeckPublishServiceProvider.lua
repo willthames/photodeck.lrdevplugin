@@ -13,16 +13,21 @@ local PhotoDeckAPI = require 'PhotoDeckAPI'
 local PhotoDeckUtils = require 'PhotoDeckUtils'
 local printTable = PhotoDeckUtils.printTable
 
-local exportServiceProvider = {}
+local publishServiceProvider = {}
 
 -- needed to publish in addition to export
-exportServiceProvider.supportsIncrementalPublish = true
+publishServiceProvider.supportsIncrementalPublish = true
 -- exportLocation gets replaced with PhotoDeck specific form section
-exportServiceProvider.hideSections = { 'exportLocation' }
-exportServiceProvider.small_icon = 'photodeck16.png'
+publishServiceProvider.hideSections = { 'exportLocation' }
+publishServiceProvider.small_icon = 'photodeck16.png'
+
+publishServiceProvider.titleForPublishedCollection = "Gallery"
+publishServiceProvider.titleForPublishedCollectionSet = "Folder"
+publishServiceProvider.titleForGoToPublishedCollection = "Go to Gallery"
+
 
 -- these fields get stored between uses
-exportServiceProvider.exportPresetFields = {
+publishServiceProvider.exportPresetFields = {
   { key = 'username', default = "" },
   { key = 'password', default = "" },
   { key = 'fullname', default = "" },
@@ -100,7 +105,7 @@ local function getWebsites(propertyTable)
   end, 'PhotoDeckAPI Get Websites')
 end
 
-function exportServiceProvider.startDialog(propertyTable)
+function publishServiceProvider.startDialog(propertyTable)
   propertyTable.loggedin = false
   if propertyTable.apiKey == '' or propertyTable.apiSecret == '' then
     propertyTable = updateApiKeyAndSecret(propertyTable)
@@ -113,7 +118,7 @@ function exportServiceProvider.startDialog(propertyTable)
   end
 end
 
-function exportServiceProvider.sectionsForTopOfDialog( f, propertyTable )
+function publishServiceProvider.sectionsForTopOfDialog( f, propertyTable )
   -- LrMobdebug.on()
   propertyTable.pingResult = 'Awaiting instructions'
   propertyTable.loggedinResult = 'Not logged in'
@@ -239,7 +244,7 @@ function exportServiceProvider.sectionsForTopOfDialog( f, propertyTable )
 end
 
 
-function exportServiceProvider.processRenderedPhotos( functionContext, exportContext )
+function publishServiceProvider.processRenderedPhotos( functionContext, exportContext )
 
   local exportSession = exportContext.exportSession
   local exportSettings = assert( exportContext.propertyTable )
@@ -275,7 +280,7 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
   end
   exportSession:recordRemoteCollectionId(gallery.uuid)
   local website = PhotoDeckAPI.websites()[urlname]
-  gallery.fullurl = website.homeurl .. "/-/" .. gallery.urlpath
+  gallery.fullurl = website.homeurl .. "/-/" .. gallery.fullurlpath
   exportSession:recordRemoteCollectionUrl(gallery.fullurl)
 
   local photodeckPhotoIdsForRenditions = {}
@@ -333,15 +338,11 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
         end
 
         -- Upload or replace the photo.
-        local upload
-        if not photodeckPhotoId then
-          upload = PhotoDeckAPI.uploadPhoto( exportSettings, {
-            filePath = pathOrMessage,
-            gallery = gallery.uuid,
-          } )
-        else
-          upload = PhotoDeckAPI.getPhoto(exportSettings, photodeckPhotoId)
-        end
+        local upload = PhotoDeckAPI.uploadPhoto( exportSettings, {
+          filePath = pathOrMessage,
+          gallery = gallery,
+          replace = not not photodeckPhotoId,
+        })
 
         -- Use the below code once we know what we want to update
         --[[
@@ -370,4 +371,14 @@ function exportServiceProvider.processRenderedPhotos( functionContext, exportCon
 
 end
 
-return exportServiceProvider
+publishServiceProvider.deletePhotosFromPublishedCollection = function( publishSettings, arrayOfPhotoIds, deletedCallback, localCollectionId )
+  PhotoDeckAPI.connect(publishSettings.apiKey, publishSettings.apiSecret, publishSettings.username, publishSettings.password)
+  for i, photoId in ipairs( arrayOfPhotoIds ) do
+
+    PhotoDeckAPI.deletePhoto(publishSettings, photoId)
+    deletedCallback( photoId )
+
+  end
+end
+
+return publishServiceProvider
