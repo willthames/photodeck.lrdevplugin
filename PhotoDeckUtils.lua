@@ -86,4 +86,8 @@ function PhotoDeckUtils.printLrTable(t, sep)
   return table.concat(result, sep)
 end
 
+function PhotoDeckUtils.basename(path)
+  return string.match(path, '([^/\\]*)$')
+end
+
 return PhotoDeckUtils

@@ -206,14 +206,15 @@ function PhotoDeckAPI.uploadPhoto( exportSettings, t)
   local content = {
     { name = 'media[publish_to_galleries]', value = t.gallery.uuid },
     { name = 'media[replace]', value = PhotoDeckUtils.toString(t.replace) },
-    { name = 'media[content]', filePath = t.filePath, fileName = t.filePath, contentType = 'image/jpeg' },
+    { name = 'media[content]', filePath = t.filePath,
+      fileName = PhotoDeckUtils.basename(t.filePath), contentType = 'image/jpeg' },
   }
   logger:trace(printTable(content))
   local response, resp_headers = LrHttp.postMultipart(urlprefix .. '/medias.xml', content, headers)
   handle_errors(response, resp_headers)
   local media = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.uploadPhoto)
   logger:trace(printTable(media))
-  media.url = t.gallery.fullurl .. "/-/" .. media.path
+  media.url = t.gallery.fullurl .. "/-/medias" .. media.uuid
 
   return media
 end
@@ -225,7 +226,8 @@ function PhotoDeckAPI.updatePhoto(exportSettings, uuid, t)
   for k, v in pairs(t) do
     if k == 'content' then
       table.insert(content, { name = 'media[content]', filePath = t.content,
-                              fileName = t.content, contentType = 'image/jpeg' })
+                              fileName = PhotoDeckUtils.basename(t.content),
+                              contentType = 'image/jpeg' })
     else
       table.insert(content, { name = 'media[' .. k .. ']', value = v})
     end
