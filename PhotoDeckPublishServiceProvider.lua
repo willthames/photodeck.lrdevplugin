@@ -36,7 +36,6 @@ publishServiceProvider.exportPresetFields = {
   { key = 'websiteChosen', default = "" },
 }
 
-
 local function  updateApiKeyAndSecret(propertyTable)
   local f = LrView.osFactory()
   local c = f:column {
@@ -51,6 +50,7 @@ local function  updateApiKeyAndSecret(propertyTable)
       f:edit_field {
         value = LrView.bind 'apiKey',
         immediate = false,
+        width_in_chars = 40,
       }
     },
     f:row {
@@ -62,6 +62,7 @@ local function  updateApiKeyAndSecret(propertyTable)
       f:edit_field {
         value = LrView.bind 'apiSecret',
         immediate = false,
+        width_in_chars = 40,
       },
     },
   }
@@ -116,7 +117,9 @@ local function getWebsites(propertyTable)
     for k, v in pairs(propertyTable.websites) do
       table.insert(propertyTable.websiteChoices, { title = v.title, value = k })
     end
-    propertyTable.websiteName = propertyTable.websites[propertyTable.websiteChosen].title
+    if propertyTable.websiteChosen and #propertyTable.websiteChosen then
+      propertyTable.websiteName = propertyTable.websites[propertyTable.websiteChosen].title
+    end
   end, 'PhotoDeckAPI Get Websites')
 end
 
@@ -128,12 +131,15 @@ function publishServiceProvider.startDialog(propertyTable)
   propertyTable.loggedin = false
   propertyTable.websiteChoices = {}
   propertyTable.websiteName = ''
-  if propertyTable.apiKey == '' or propertyTable.apiSecret == '' then
+  if not propertyTable.apiKey or not #propertyTable.apiKey
+    or not propertyTable.apiSecret or not #propertyTable.apiSecret then
     propertyTable = updateApiKeyAndSecret(propertyTable)
   end
   ping(propertyTable)
-  if #propertyTable.username and #propertyTable.password and
-    #propertyTable.apiKey and #propertyTable.apiSecret then
+  if propertyTable.username and #propertyTable.username and
+     propertyTable.password and #propertyTable.password and
+     propertyTable.apiKey and #propertyTable.apiKey and
+     propertyTable.apiSecret and #propertyTable.apiSecret then
     login(propertyTable)
     getWebsites(propertyTable)
   end
@@ -227,7 +233,10 @@ function publishServiceProvider.sectionsForTopOfDialog( f, propertyTable )
         width = tonumber( LOC "$$$/locale_metric/PhotoDeck/ExportDialog/TestButton/Width=90" ),
         title = 'Login',
         enabled = LrBinding.negativeOfKey('loggedin'),
-        action = function () login(propertyTable) end
+        action = function ()
+          login(propertyTable)
+          getWebsites(propertyTable)
+        end
       },
 
       f:static_text {
@@ -249,10 +258,11 @@ function publishServiceProvider.sectionsForTopOfDialog( f, propertyTable )
       f:push_button {
         title = 'Choose website',
         action = function() propertyTable = chooseWebsite(propertyTable) end,
-        enabled = LrView.bind 'loggedin',
+        enabled = LrView.bind 'loggedin'
       },
       f:static_text {
         title = LrView.bind 'websiteName',
+        width_in_chars = 40,
       }
     }
   }
