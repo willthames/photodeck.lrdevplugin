@@ -34,8 +34,8 @@ publishServiceProvider.exportPresetFields = {
   { key = 'apiKey', default = "" },
   { key = 'apiSecret', default = "" },
   { key = 'websiteChosen', default = "" },
-  { key = 'websites', default = {} },
 }
+
 
 local function  updateApiKeyAndSecret(propertyTable)
   local f = LrView.osFactory()
@@ -72,6 +72,23 @@ local function  updateApiKeyAndSecret(propertyTable)
   return propertyTable
 end
 
+local function chooseWebsite(propertyTable)
+  local f = LrView.osFactory()
+  local c = f:row {
+    spacing = f:dialog_spacing(),
+    bind_to_object = propertyTable,
+    f:popup_menu {
+      items = LrView.bind 'websiteChoices',
+      value = LrView.bind 'websiteChosen',
+    },
+  }
+  local result = LrDialogs.presentModalDialog({
+    title = LOC "$$$/PhotoDeck/WebsiteChoice=PhotoDeck Websites",
+    contents = c,
+  })
+  return propertyTable
+end
+
 local function ping(propertyTable)
   propertyTable.pingResult = 'making api call'
   PhotoDeckAPI.connect(propertyTable.apiKey, propertyTable.apiSecret)
@@ -96,17 +113,21 @@ local function getWebsites(propertyTable)
        propertyTable.apiSecret, propertyTable.username, propertyTable.password)
   LrTasks.startAsyncTask(function()
     propertyTable.websites = PhotoDeckAPI.websites()
-    propertyTable.websiteChoices = {}
     for k, v in pairs(propertyTable.websites) do
       table.insert(propertyTable.websiteChoices, { title = v.title, value = k })
     end
-    logger:trace(printTable(propertyTable.websiteChoices))
-    logger:trace(printTable(propertyTable.websites))
+    propertyTable.websiteName = propertyTable.websites[propertyTable.websiteChosen].title
   end, 'PhotoDeckAPI Get Websites')
+end
+
+local function updateWebsiteName(propertyTable, key, value)
+  propertyTable.websiteName = propertyTable.websites[value].title
 end
 
 function publishServiceProvider.startDialog(propertyTable)
   propertyTable.loggedin = false
+  propertyTable.websiteChoices = {}
+  propertyTable.websiteName = ''
   if propertyTable.apiKey == '' or propertyTable.apiSecret == '' then
     propertyTable = updateApiKeyAndSecret(propertyTable)
   end
@@ -116,6 +137,8 @@ function publishServiceProvider.startDialog(propertyTable)
     login(propertyTable)
     getWebsites(propertyTable)
   end
+
+  propertyTable:addObserver('websiteChosen', updateWebsiteName)
 end
 
 function publishServiceProvider.sectionsForTopOfDialog( f, propertyTable )
@@ -218,21 +241,19 @@ function publishServiceProvider.sectionsForTopOfDialog( f, propertyTable )
   }
   local websiteChoice = {
     title = LOC "$$$/PhotoDeck/ExportDialog/Account=PhotoDeck Website",
-    synopsis = LrView.bind 'websiteChosen',
+    synopsis = LrView.bind 'websiteName',
 
     f:row {
       bind_to_object = propertyTable,
 
-      f:static_text {
+      f:push_button {
         title = 'Choose website',
+        action = function() propertyTable = chooseWebsite(propertyTable) end,
+        enabled = LrView.bind 'loggedin',
       },
-
-      f:popup_menu {
-        title = "Select Website",
-        items = LrView.bind 'websiteChoices',
-        value = LrView.bind 'websiteChosen',
-      },
-
+      f:static_text {
+        title = LrView.bind 'websiteName',
+      }
     }
   }
 
