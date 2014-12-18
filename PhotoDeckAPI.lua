@@ -214,7 +214,7 @@ function PhotoDeckAPI.uploadPhoto( exportSettings, t)
   handle_errors(response, resp_headers)
   local media = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.uploadPhoto)
   logger:trace(printTable(media))
-  media.url = t.gallery.fullurl .. "/-/medias" .. media.uuid
+  media.url = t.gallery.fullurl .. "/-/medias/" .. media.uuid
 
   return media
 end
