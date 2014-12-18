@@ -341,7 +341,7 @@ function publishServiceProvider.processRenderedPhotos( functionContext, exportCo
         local upload = PhotoDeckAPI.uploadPhoto( exportSettings, {
           filePath = pathOrMessage,
           gallery = gallery,
-          replace = not not photodeckPhotoId,
+          replace = photodeckPhotoId and 1 or 0,
         })
 
         -- Use the below code once we know what we want to update
