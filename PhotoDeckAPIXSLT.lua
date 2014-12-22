@@ -93,6 +93,18 @@ return t
   </xsl:template>
 ]] .. xsltfooter
 
+PhotoDeckAPIXSLT.galleryDisplayStyles = xsltheader .. [[
+  <xsl:template match='/reply/gallery-display-styles'>
+local t = {}
+    <xsl:for-each select='gallery-display-style'>
+t["<xsl:value-of select='uuid'/>"] = {
+     uuid = "<xsl:value-of select='uuid'/>",
+     name = "<xsl:value-of select='name'/>",
+}
+   </xsl:for-each>
+return t
+  </xsl:template>
+]] .. xsltfooter
 
 PhotoDeckAPIXSLT.transform = function(xmlstring, xslt)
   local xml = LrXml.parseXml(xmlstring)

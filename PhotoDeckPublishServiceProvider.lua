@@ -24,7 +24,7 @@ publishServiceProvider.small_icon = 'photodeck16.png'
 publishServiceProvider.titleForPublishedCollection = "Gallery"
 publishServiceProvider.titleForPublishedCollectionSet = "Folder"
 publishServiceProvider.titleForGoToPublishedCollection = "Go to Gallery"
-
+publishServiceProvider.disableRenamePublishedCollectionSet = true
 
 -- these fields get stored between uses
 publishServiceProvider.exportPresetFields = {
@@ -90,6 +90,23 @@ local function chooseWebsite(propertyTable)
   return propertyTable
 end
 
+local function chooseGalleryDisplayStyle(propertyTable, collectionInfo)
+  local f = LrView.osFactory()
+  local c = f:row {
+    spacing = f:dialog_spacing(),
+    bind_to_object = propertyTable,
+    f:popup_menu {
+      items = LrView.bind 'galleryDisplayStyles',
+      value = LrView.bind { bind_to_object = collectionInfo, key = 'display_style' }
+    },
+  }
+  local result = LrDialogs.presentModalDialog({
+    title = LOC "$$$/PhotoDeck/GalleryDisplayStyle=Gallery Display Style",
+    contents = c,
+  })
+  return propertyTable
+end
+
 local function ping(propertyTable)
   propertyTable.pingResult = 'making api call'
   PhotoDeckAPI.connect(propertyTable.apiKey, propertyTable.apiSecret)
@@ -109,6 +126,30 @@ local function login(propertyTable)
   end, 'PhotoDeckAPI Login')
 end
 
+local function onGalleryDisplayStyleSelect(propertyTable, key, value)
+  propertyTable.galleryDisplayStyleName = propertyTable.galleryDisplayStyles[value].title
+end
+
+local function getGalleryDisplayStyles(propertyTable, collectionInfo)
+  propertyTable.galleryDisplayStyles = {}
+  PhotoDeckAPI.connect(propertyTable.apiKey,
+       propertyTable.apiSecret, propertyTable.username, propertyTable.password)
+  LrTasks.startAsyncTask(function()
+    local galleryDisplayStyles = PhotoDeckAPI.galleryDisplayStyles(propertyTable.websiteChosen)
+    for k, v in pairs(galleryDisplayStyles) do
+      table.insert(propertyTable.galleryDisplayStyles, { title = v.name, value = v.uuid })
+    end
+    if collectionInfo.display_style and collectionInfo.display_style ~= '' then
+      onWebsiteSelect(collectionInfo, _, collectionInfo.display_style)
+    end
+    logger:trace(printTable(propertyTable.galleryDisplayStyles))
+  end, 'PhotoDeckAPI Get Gallery Display Styles')
+end
+
+local function onWebsiteSelect(propertyTable, key, value)
+  propertyTable.websiteName = propertyTable.websites[value].title
+end
+
 local function getWebsites(propertyTable)
   PhotoDeckAPI.connect(propertyTable.apiKey,
        propertyTable.apiSecret, propertyTable.username, propertyTable.password)
@@ -118,18 +159,15 @@ local function getWebsites(propertyTable)
       table.insert(propertyTable.websiteChoices, { title = v.title, value = k })
     end
     if propertyTable.websiteChosen and propertyTable.websiteChosen ~= '' then
-      propertyTable.websiteName = propertyTable.websites[propertyTable.websiteChosen].title
+      onWebsiteSelect(propertyTable, _, propertyTable.websiteChosen)
     end
   end, 'PhotoDeckAPI Get Websites')
-end
-
-local function updateWebsiteName(propertyTable, key, value)
-  propertyTable.websiteName = propertyTable.websites[value].title
 end
 
 function publishServiceProvider.startDialog(propertyTable)
   propertyTable.loggedin = false
   propertyTable.websiteChoices = {}
+  propertyTable.galleryDisplayStyles = {}
   propertyTable.websiteName = ''
   if not propertyTable.apiKey or propertyTable.apiKey == ''
     or not propertyTable.apiSecret or propertyTable.apiSecret == '' then
@@ -144,7 +182,7 @@ function publishServiceProvider.startDialog(propertyTable)
     getWebsites(propertyTable)
   end
 
-  propertyTable:addObserver('websiteChosen', updateWebsiteName)
+  propertyTable:addObserver('websiteChosen', onWebsiteSelect)
 end
 
 function publishServiceProvider.sectionsForTopOfDialog( f, propertyTable )
@@ -274,7 +312,6 @@ function publishServiceProvider.sectionsForTopOfDialog( f, propertyTable )
   }
 end
 
-
 function publishServiceProvider.processRenderedPhotos( functionContext, exportContext )
 
   local exportSession = exportContext.exportSession
@@ -292,16 +329,16 @@ function publishServiceProvider.processRenderedPhotos( functionContext, exportCo
 
   -- Save off uploaded photo IDs so we can take user to those photos later.
   local uploadedPhotoIds = {}
-  local publishedCollectionInfo = exportContext.publishedCollectionInfo
+  local publishedCollection = exportContext.publishedCollection
   -- Look for a gallery id for this collection.
-  local galleryId = publishedCollectionInfo.remoteId
+  local galleryId = publishedCollection:getRemoteId()
   local galleryPhotos
   local gallery
   local urlname = exportSettings.websiteChosen
 
   if not galleryId then
     -- Create or update this gallery.
-    gallery = PhotoDeckAPI.createOrUpdateGallery(exportSettings, publishedCollectionInfo)
+    gallery = PhotoDeckAPI.createOrUpdateGallery(exportSettings, publishedCollection.name, publishedCollection)
   else
     -- Get a list of photos already in this gallery so we know which ones we can replace and which have
     -- to be re-uploaded entirely.
@@ -410,6 +447,73 @@ publishServiceProvider.deletePhotosFromPublishedCollection = function( publishSe
     deletedCallback( photoId )
 
   end
+end
+
+-- no idea what actual criteria are
+publishServiceProvider.validatePublishedCollectionName = function( proposedName )
+  return string.match(proposedName, '^[%w:/_-]*$')
+end
+
+publishServiceProvider.viewForCollectionSettings = function( f, publishSettings, info )
+  info.collectionSettings:addObserver('display_style', onGalleryDisplayStyleSelect)
+  getGalleryDisplayStyles(publishSettings, info.collectionSettings)
+  c = f:view {
+    bind_to_object = info,
+    spacing = f:dialog_spacing(),
+
+    f:row {
+      f:static_text {
+        title = "Name:",
+        width = LrView.share "collectionset_labelwidth",
+      },
+      f:static_text {
+        title = LrView.bind 'name',
+      }
+    },
+    f:row {
+      f:static_text {
+        title = "Description:",
+        width = LrView.share "collectionset_labelwidth",
+      },
+      f:edit_field {
+        bind_to_object = info.collectionSettings,
+        value = LrView.bind 'description',
+        width_in_chars = 40,
+        height_in_chars = 5,
+      }
+    },
+    f:row {
+      f:static_text {
+        title = "Gallery Style:",
+        width = LrView.share "collectionset_labelwidth",
+      },
+      f:static_text {
+        bind_to_object = info.collectionSettings,
+        title = LrView.bind 'galleryDisplayStyleName',
+        width_in_chars = 30,
+      },
+      f:push_button {
+        bind_to_object = publishSettings,
+        action = function() chooseGalleryDisplayStyle(publishSettings, info.collectionSettings) end,
+        enabled = LrBinding.keyIsNotNil 'galleryDisplayStyles',
+        title = "Choose Gallery Style",
+      }
+    }
+  }
+
+  local result = LrDialogs.presentModalDialog({
+    title = LOC "$$$/PhotoDeck/CollectionSetSettings=Gallery Settings",
+    contents = c,
+  })
+  return propertyTable
+end
+
+publishServiceProvider.updateCollecionSettings = function( publishSettings, info )
+  gallery = PhotoDeckAPI.createOrUpdateGallery(publishSettings, info.name, info.publishedCollection)
+end
+
+publishServiceProvider.renamePublishedCollection = function( publishSettings, info )
+  gallery = PhotoDeckAPI.createOrUpdateGallery(publishSettings, info.name, info.publishedCollection)
 end
 
 return publishServiceProvider
