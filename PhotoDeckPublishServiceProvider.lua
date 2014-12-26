@@ -7,7 +7,7 @@ local LrView = import 'LrView'
 
 local logger = import 'LrLogger'( 'PhotoDeckPublishServiceProvider' )
 
-logger:enable('print')
+logger:enable('logfile')
 
 local PhotoDeckAPI = require 'PhotoDeckAPI'
 local PhotoDeckUtils = require 'PhotoDeckUtils'
