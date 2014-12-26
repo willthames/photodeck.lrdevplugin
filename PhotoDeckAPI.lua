@@ -126,6 +126,7 @@ function PhotoDeckAPI.connect(key, secret, username, password)
 end
 
 function PhotoDeckAPI.ping(text)
+  logger:trace('PhotoDeckAPI.ping')
   local t = {}
   if text then
     t = { text = text }
@@ -136,6 +137,7 @@ function PhotoDeckAPI.ping(text)
 end
 
 function PhotoDeckAPI.whoami()
+  logger:trace('PhotoDeckAPI.whoami')
   local response, headers = PhotoDeckAPI.request('GET', '/whoami.xml')
   local result = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.whoami)
   -- logger:trace(printTable(result))
@@ -143,6 +145,7 @@ function PhotoDeckAPI.whoami()
 end
 
 function PhotoDeckAPI.websites()
+  logger:trace('PhotoDeckAPI.websites')
   local response, headers = PhotoDeckAPI.request('GET', '/websites.xml', { view = 'details' })
   local result = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.websites)
   -- logger:trace(printTable(result))
@@ -150,6 +153,7 @@ function PhotoDeckAPI.websites()
 end
 
 function PhotoDeckAPI.galleries(urlname)
+  logger:trace('PhotoDeckAPI.galleries')
   local response, headers = PhotoDeckAPI.request('GET', '/websites/' .. urlname .. '/galleries.xml', { view = 'details' })
   local result = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.galleries)
   -- logger:trace(printTable(result))
@@ -157,6 +161,7 @@ function PhotoDeckAPI.galleries(urlname)
 end
 
 function PhotoDeckAPI.createGallery(urlname, galleryname, parentId)
+  logger:trace('PhotoDeckAPI.createGallery')
   local galleryInfo = {}
   galleryInfo['gallery[name]'] = galleryname
   galleryInfo['gallery[parent]'] = parentId
@@ -166,6 +171,7 @@ function PhotoDeckAPI.createGallery(urlname, galleryname, parentId)
 end
 
 function PhotoDeckAPI.createOrUpdateGallery(exportSettings, collectionInfo)
+  logger:trace('PhotoDeckAPI.createorUpdateGallery')
   local urlname = exportSettings.websiteChosen
   local galleries = PhotoDeckAPI.galleries(urlname)
   local gallery
@@ -188,6 +194,7 @@ function PhotoDeckAPI.createOrUpdateGallery(exportSettings, collectionInfo)
 end
 
 function PhotoDeckAPI.photosInGallery(exportSettings, gallery)
+  logger:trace('PhotoDeckAPI.photosInGallery')
   local url = '/websites/' .. exportSettings.websiteChosen .. '/galleries/' .. gallery.uuid .. '.xml'
   local response, headers = PhotoDeckAPI.request('GET', url, { view = 'details_with_medias' })
   local medias = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.photosInGallery)
@@ -201,6 +208,7 @@ function PhotoDeckAPI.photosInGallery(exportSettings, gallery)
 end
 
 function PhotoDeckAPI.uploadPhoto( exportSettings, t)
+  logger:trace('PhotoDeckAPI.uploadPhoto')
   -- set up authorisation headers request
   local headers = auth_headers('POST', '/medias.xml')
   local content = {
@@ -220,6 +228,7 @@ function PhotoDeckAPI.uploadPhoto( exportSettings, t)
 end
 
 function PhotoDeckAPI.updatePhoto(exportSettings, uuid, t)
+  logger:trace('PhotoDeckAPI.updatePhoto')
   -- set up authorisation headers request
   local headers = auth_headers('POST', '/medias/' .. uuid .. '.xml')
   local content = {}
@@ -237,6 +246,7 @@ function PhotoDeckAPI.updatePhoto(exportSettings, uuid, t)
 end
 
 function PhotoDeckAPI.deletePhoto(publishSettings, photoId)
+  logger:trace('PhotoDeckAPI.deletePhoto')
   response, resp_headers = PhotoDeckAPI.request('DELETE', '/medias/' .. photoId .. '.xml')
   logger:trace(response)
 end
