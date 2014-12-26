@@ -85,7 +85,7 @@ local t = {
 return t
   </xsl:template>
   <xsl:template match='/reply'>
-local t = { 
+local t = {
   uuid = "<xsl:value-of select='media-uuid'/>",
   path = "<xsl:value-of select='location'/>",
 }
@@ -97,7 +97,11 @@ return t
 PhotoDeckAPIXSLT.transform = function(xmlstring, xslt)
   local xml = LrXml.parseXml(xmlstring)
   local luastring = xml:transform(xslt)
-  logger:trace(luastring)
+  if luastring ~= '' then
+    logger:trace(luastring)
+  else
+    logger:trace(xml)
+  end
   local f = assert(loadstring(luastring))
   return f()
 end

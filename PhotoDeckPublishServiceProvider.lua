@@ -117,7 +117,7 @@ local function getWebsites(propertyTable)
     for k, v in pairs(propertyTable.websites) do
       table.insert(propertyTable.websiteChoices, { title = v.title, value = k })
     end
-    if propertyTable.websiteChosen and #propertyTable.websiteChosen then
+    if propertyTable.websiteChosen and propertyTable.websiteChosen ~= '' then
       propertyTable.websiteName = propertyTable.websites[propertyTable.websiteChosen].title
     end
   end, 'PhotoDeckAPI Get Websites')
@@ -131,15 +131,15 @@ function publishServiceProvider.startDialog(propertyTable)
   propertyTable.loggedin = false
   propertyTable.websiteChoices = {}
   propertyTable.websiteName = ''
-  if not propertyTable.apiKey or not #propertyTable.apiKey
-    or not propertyTable.apiSecret or not #propertyTable.apiSecret then
+  if not propertyTable.apiKey or propertyTable.apiKey == ''
+    or not propertyTable.apiSecret or propertyTable.apiSecret == '' then
     propertyTable = updateApiKeyAndSecret(propertyTable)
   end
   ping(propertyTable)
-  if propertyTable.username and #propertyTable.username and
-     propertyTable.password and #propertyTable.password and
-     propertyTable.apiKey and #propertyTable.apiKey and
-     propertyTable.apiSecret and #propertyTable.apiSecret then
+  if propertyTable.username and propertyTable.username ~= '' and
+     propertyTable.password and propertyTable.password ~= '' and
+     propertyTable.apiKey and propertyTable.apiKey ~= '' and
+     propertyTable.apiSecret and propertyTable.apiSecret ~= '' then
     login(propertyTable)
     getWebsites(propertyTable)
   end
