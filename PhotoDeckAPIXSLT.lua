@@ -1,6 +1,6 @@
 local LrXml = import 'LrXml'
 local logger = import 'LrLogger'('PhotoDeckAPIXSLT')
-logger:enable('print')
+logger:enable('logfile')
 
 local xsltheader = [[
 <xsl:stylesheet version="1.0"

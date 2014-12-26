@@ -9,7 +9,7 @@ local PhotoDeckUtils = require 'PhotoDeckUtils'
 local PhotoDeckAPIXSLT = require 'PhotoDeckAPIXSLT'
 
 local logger = import 'LrLogger'( 'PhotoDeckAPI' )
-logger:enable('print')
+logger:enable('logfile')
 
 local urlprefix = 'http://api.photodeck.com'
 local isTable = PhotoDeckUtils.isTable
