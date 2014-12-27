@@ -8,7 +8,7 @@ local LrXml = import 'LrXml'
 local PhotoDeckUtils = require 'PhotoDeckUtils'
 local PhotoDeckAPIXSLT = require 'PhotoDeckAPIXSLT'
 
-local logger = import 'LrLogger'( 'PhotoDeckAPI' )
+local logger = import 'LrLogger'( 'PhotoDeckPublishLightroomPlugin' )
 logger:enable('logfile')
 
 local urlprefix = 'http://api.photodeck.com'
@@ -219,11 +219,11 @@ function PhotoDeckAPI.uploadPhoto( exportSettings, t)
     { name = 'media[content]', filePath = t.filePath,
       fileName = PhotoDeckUtils.basename(t.filePath), contentType = 'image/jpeg' },
   }
-  logger:trace(printTable(content))
+  logger:trace('PhotoDeckAPI.uploadPhoto: ' .. printTable(content))
   local response, resp_headers = LrHttp.postMultipart(urlprefix .. '/medias.xml', content, headers)
   handle_errors(response, resp_headers)
   local media = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.uploadPhoto)
-  logger:trace(printTable(media))
+  logger:trace('PhotoDeckAPI.uploadPhoto: ' .. printTable(media))
   media.url = t.gallery.fullurl .. "/-/medias/" .. media.uuid
 
   return media
@@ -250,7 +250,7 @@ end
 function PhotoDeckAPI.deletePhoto(publishSettings, photoId)
   logger:trace('PhotoDeckAPI.deletePhoto')
   response, resp_headers = PhotoDeckAPI.request('DELETE', '/medias/' .. photoId .. '.xml')
-  logger:trace(response)
+  logger:trace('PhotoDeckAPI.deletePhoto: ' .. response)
 end
 
 return PhotoDeckAPI
