@@ -1,7 +1,7 @@
 $source = "https://github.com/willthames/photodeck.lrdevplugin/archive/master.zip"
-$destination = ~\Downloads\photodeck-lrdevplugin.zip
+$destination = Join-Path -Path $env:USERPROFILE -Child-Path "\Downloads\photodeck-lrdevplugin.zip"
 
-Invoke-WebRequest $source -OutFile $destination
+(New-Object System.Net.WebClient).DownloadFile($source, $destination)
 
 $shell = New-Object -com shell.application
 $zip = $shell.NameSpace($destination)
