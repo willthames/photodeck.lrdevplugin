@@ -1,4 +1,4 @@
-local LrDate =import 'LrDate'
+local LrDate = import 'LrDate'
 local LrDigest = import 'LrDigest'
 local LrDialogs = import 'LrDialogs'
 local LrHttp = import 'LrHttp'
@@ -194,9 +194,9 @@ function PhotoDeckAPI.updateGallery(urlname, uuid, newname, gallery, parentId)
 end
 
 
-function PhotoDeckAPI.createOrUpdateGallery(exportSettings, name, collectionInfo)
+function PhotoDeckAPI.createOrUpdateGallery(publishSettings, name, collectionInfo)
   logger:trace('PhotoDeckAPI.createOrUpdateGallery')
-  local urlname = exportSettings.websiteChosen
+  local urlname = publishSettings.websiteChosen
   local website = PhotoDeckAPI.websites()[urlname]
   local galleries = PhotoDeckAPI.galleries(urlname)
   local parentgallery = galleries["Galleries"]
@@ -207,28 +207,30 @@ function PhotoDeckAPI.createOrUpdateGallery(exportSettings, name, collectionInfo
   assert(not collectionInfo.parents or #collectionInfo.parents < 2)
   for _, parent in pairs(collectionInfo.parents) do
     parentgallery = galleries[parent.remoteCollectionId] or galleries[parent.name]
-    logger:trace(printTable(parentgallery))
     if not parentgallery then
       parentgallery = PhotoDeckAPI.createGallery(urlname, parent.name, parent,
           galleries["Galleries"].uuid)
     end
-  end
-  if collection:getParent() and not collection:getParent():getRemoteId() then
-    parent = collection:getParent()
+    local parentCollection = collection.catalog:getPublishedCollectionByLocalIdentifier(parent.localCollectionId)
+    logger:trace(printTable(parentCollection))
     parentgallery.fullurl = website.homeurl .. "/-/" .. parentgallery.fullurlpath
-    parent.catalog:withWriteAccessDo('Set Parent Remote Id and Url', function()
-        parent:setRemoteId(parentgallery.uuid)
-        parent:setRemoteUrl(parentgallery.fullurl)
-    end)
+    if parentCollection and (not parent.remoteCollectionId or parentCollection:getRemoteId() ~= parent.remoteCollectionId or parentCollection:getRemoteUrl() ~= parentgallery.fullurl) then
+      logger:trace('Updating parent remote Id and Url')
+      parentCollection.catalog:withWriteAccessDo('Set Parent Remote Id and Url', function()
+        parentCollection:setRemoteId(parentgallery.uuid)
+        parentCollection:setRemoteUrl(parentgallery.fullurl)
+      end)
+    end
   end
   if gallery then
     gallery = PhotoDeckAPI.updateGallery(urlname, gallery.uuid, name, collection, parentgallery.uuid)
   else
     gallery = PhotoDeckAPI.createGallery(urlname, name, collection, parentgallery.uuid)
   end
-  if collection:getRemoteId() == nil then
-    local website = PhotoDeckAPI.websites()[urlname]
-    gallery.fullurl = website.homeurl .. "/-/" .. gallery.fullurlpath
+  gallery.fullurl = website.homeurl .. "/-/" .. gallery.fullurlpath
+  if collection:getRemoteId() == nil or collection:getRemoteId() ~= gallery.uuid or
+      collection:getRemoteUrl() ~= gallery.fullurl then
+    logger:trace('Updating collection remote Id and Url')
     collection.catalog:withWriteAccessDo('Set Remote Id and Url', function()
       collection:setRemoteId(gallery.uuid)
       collection:setRemoteUrl(gallery.fullurl)
