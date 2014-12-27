@@ -100,7 +100,7 @@ PhotoDeckAPIXSLT.transform = function(xmlstring, xslt)
   if luastring ~= '' then
     logger:trace(luastring)
   else
-    logger:trace(xml)
+    logger:trace(xmlstring)
   end
   local f = assert(loadstring(luastring))
   return f()
