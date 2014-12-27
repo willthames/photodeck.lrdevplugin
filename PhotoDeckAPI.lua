@@ -170,15 +170,15 @@ local function buildGalleryInfo(gallery)
   return galleryInfo
 end
 
-function PhotoDeckAPI.createGallery(urlname, gallery, parentId)
+function PhotoDeckAPI.createGallery(urlname, name, gallery, parentId)
   logger:trace('PhotoDeckAPI.createGallery')
   local galleryInfo = buildGalleryInfo(gallery)
   galleryInfo['gallery[parent]'] = parentId
-  galleryInfo['gallery[name]'] = gallery:getName()
+  galleryInfo['gallery[name]'] = name
   logger:trace(printTable(galleryInfo))
   PhotoDeckAPI.request('POST', '/websites/' .. urlname .. '/galleries.xml', galleryInfo)
   local galleries = PhotoDeckAPI.galleries(urlname)
-  return galleries[gallery:getName()]
+  return galleries[name]
 end
 
 function PhotoDeckAPI.updateGallery(urlname, uuid, newname, gallery, parentId)
@@ -194,30 +194,37 @@ function PhotoDeckAPI.updateGallery(urlname, uuid, newname, gallery, parentId)
 end
 
 
-function PhotoDeckAPI.createOrUpdateGallery(exportSettings, name, collection)
+function PhotoDeckAPI.createOrUpdateGallery(exportSettings, name, collectionInfo)
   logger:trace('PhotoDeckAPI.createOrUpdateGallery')
   local urlname = exportSettings.websiteChosen
-  local galleryInfo
+  local website = PhotoDeckAPI.websites()[urlname]
   local galleries = PhotoDeckAPI.galleries(urlname)
+  local parentgallery = galleries["Galleries"]
+  local collection = collectionInfo.publishedCollection
   -- prefer remote Id, particularly for renames, but optionally defer to name
-  local gallery = galleries[collection:getRemoteId()] or galleries[collection:getName()]
+  local gallery = galleries[collection:getRemoteId()] or galleries[name]
+  -- no idea how to deal with multiple parents as yet
+  assert(not collectionInfo.parents or #collectionInfo.parents < 2)
+  for _, parent in pairs(collectionInfo.parents) do
+    parentgallery = galleries[parent.remoteCollectionId] or galleries[parent.name]
+    logger:trace(printTable(parentgallery))
+    if not parentgallery then
+      parentgallery = PhotoDeckAPI.createGallery(urlname, parent.name, parent,
+          galleries["Galleries"].uuid)
+    end
+  end
+  if collection:getParent() and not collection:getParent():getRemoteId() then
+    parent = collection:getParent()
+    parentgallery.fullurl = website.homeurl .. "/-/" .. parentgallery.fullurlpath
+    parent.catalog:withWriteAccessDo('Set Parent Remote Id and Url', function()
+        parent:setRemoteId(parentgallery.uuid)
+        parent:setRemoteUrl(parentgallery.fullurl)
+    end)
+  end
   if gallery then
-    -- TODO handle reparenting gallery
-    local parentgallery = galleries[gallery.parentuuid]
     gallery = PhotoDeckAPI.updateGallery(urlname, gallery.uuid, name, collection, parentgallery.uuid)
   else
-    -- no idea how to deal with multiple parents as yet
-    -- assert(not collection:getParent() or #collection:getParent() < 2)
-    local parentgallery = galleries["Galleries"]
-    if collection:getParent() then
-      for _, parent in pairs(collection:getParent()) do
-        if not galleries[parent:getRemoteId()] then
-           parentgallery = PhotoDeckAPI.createGallery(urlname, parent,
-               galleries["Galleries"].uuid)
-        end
-      end
-    end
-    gallery = PhotoDeckAPI.createGallery(urlname, collection, parentgallery.uuid)
+    gallery = PhotoDeckAPI.createGallery(urlname, name, collection, parentgallery.uuid)
   end
   if collection:getRemoteId() == nil then
     local website = PhotoDeckAPI.websites()[urlname]

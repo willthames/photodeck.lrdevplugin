@@ -332,7 +332,7 @@ function publishServiceProvider.processRenderedPhotos( functionContext, exportCo
 
   -- Save off uploaded photo IDs so we can take user to those photos later.
   local uploadedPhotoIds = {}
-  local publishedCollection = exportContext.publishedCollection
+  local collectionInfo = exportContext.publishedCollectionInfo
   -- Look for a gallery id for this collection.
   local galleryId = publishedCollection:getRemoteId()
   local galleryPhotos
@@ -341,7 +341,7 @@ function publishServiceProvider.processRenderedPhotos( functionContext, exportCo
 
   if not galleryId then
     -- Create or update this gallery.
-    gallery = PhotoDeckAPI.createOrUpdateGallery(exportSettings, publishedCollection.name, publishedCollection)
+    gallery = PhotoDeckAPI.createOrUpdateGallery(exportSettings, collectionInfo.name, collectionInfo)
   else
     -- Get a list of photos already in this gallery so we know which ones we can replace and which have
     -- to be re-uploaded entirely.
@@ -503,15 +503,15 @@ publishServiceProvider.viewForCollectionSettings = function( f, publishSettings,
 end
 
 publishServiceProvider.updateCollectionSettings = function( publishSettings, info )
-  gallery = PhotoDeckAPI.createOrUpdateGallery(publishSettings, info.collectionSettings.LR_liveName, info.publishedCollection)
+  gallery = PhotoDeckAPI.createOrUpdateGallery(publishSettings, info.collectionSettings.LR_liveName, info)
 end
 
 publishServiceProvider.renamePublishedCollection = function( publishSettings, info )
-  gallery = PhotoDeckAPI.createOrUpdateGallery(publishSettings, info.name, info.publishedCollection)
+  gallery = PhotoDeckAPI.createOrUpdateGallery(publishSettings, info.name, info)
 end
 
 publishServiceProvider.reparentPublishedCollection = function( publishSettings, info )
-  gallery = PhotoDeckAPI.createOrUpdateGallery(publishSettings, info.name, info.publishedCollection)
+  gallery = PhotoDeckAPI.createOrUpdateGallery(publishSettings, info.name, info)
 end
 
 return publishServiceProvider
