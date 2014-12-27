@@ -163,7 +163,6 @@ end
 local function buildGalleryInfo(gallery)
   local galleryInfo = {}
   if gallery.getCollectionInfoSummary then
-    logger:trace(printTable(gallery:getCollectionInfoSummary()))
     local info = gallery:getCollectionInfoSummary().collectionSettings
     galleryInfo['gallery[description]'] = info['description']
     galleryInfo['gallery[display_style]'] = info['display_style']
@@ -176,17 +175,20 @@ function PhotoDeckAPI.createGallery(urlname, gallery, parentId)
   local galleryInfo = buildGalleryInfo(gallery)
   galleryInfo['gallery[parent]'] = parentId
   galleryInfo['gallery[name]'] = gallery:getName()
+  logger:trace(printTable(galleryInfo))
   PhotoDeckAPI.request('POST', '/websites/' .. urlname .. '/galleries.xml', galleryInfo)
   local galleries = PhotoDeckAPI.galleries(urlname)
   return galleries[gallery:getName()]
 end
 
-function PhotoDeckAPI.updateGallery(urlname, newname, gallery, parentId)
+function PhotoDeckAPI.updateGallery(urlname, uuid, newname, gallery, parentId)
   logger:trace('PhotoDeckAPI.updateGallery')
   local galleryInfo = buildGalleryInfo(gallery)
   galleryInfo['gallery[name]'] = newname
   galleryInfo['gallery[parent]'] = parentId
-  PhotoDeckAPI.request('PUT', '/websites/' .. urlname .. '/galleries/' .. gallery:getRemoteId() .. '.xml', galleryInfo)
+  logger:trace(printTable(galleryInfo))
+  local response = PhotoDeckAPI.request('PUT', '/websites/' .. urlname .. '/galleries/' .. uuid .. '.xml', galleryInfo)
+  logger:trace('PhotoDeckAPI.updateGallery: ' .. response)
   local galleries = PhotoDeckAPI.galleries(urlname)
   return galleries[newname]
 end
@@ -197,21 +199,33 @@ function PhotoDeckAPI.createOrUpdateGallery(exportSettings, name, collection)
   local urlname = exportSettings.websiteChosen
   local galleryInfo
   local galleries = PhotoDeckAPI.galleries(urlname)
-  local gallery = galleries[collection:getRemoteId()]
+  -- prefer remote Id, particularly for renames, but optionally defer to name
+  local gallery = galleries[collection:getRemoteId()] or galleries[collection:getName()]
   if gallery then
+    -- TODO handle reparenting gallery
     local parentgallery = galleries[gallery.parentuuid]
-    gallery = PhotoDeckAPI.updateGallery(urlname, name, collection, parentgallery)
+    gallery = PhotoDeckAPI.updateGallery(urlname, gallery.uuid, name, collection, parentgallery.uuid)
   else
     -- no idea how to deal with multiple parents as yet
-    assert(#collection:getParent() < 2)
-    local parentgallery
-    for _, parent in pairs(collection:getParent()) do
-      if not galleries[parent:getRemoteId()] then
-        parentgallery = PhotoDeckAPI.createGallery(urlname, parent,
-            galleries["Galleries"].uuid)
+    -- assert(not collection:getParent() or #collection:getParent() < 2)
+    local parentgallery = galleries["Galleries"]
+    if collection:getParent() then
+      for _, parent in pairs(collection:getParent()) do
+        if not galleries[parent:getRemoteId()] then
+           parentgallery = PhotoDeckAPI.createGallery(urlname, parent,
+               galleries["Galleries"].uuid)
+        end
       end
     end
     gallery = PhotoDeckAPI.createGallery(urlname, collection, parentgallery.uuid)
+  end
+  if collection:getRemoteId() == nil then
+    local website = PhotoDeckAPI.websites()[urlname]
+    gallery.fullurl = website.homeurl .. "/-/" .. gallery.fullurlpath
+    collection.catalog:withWriteAccessDo('Set Remote Id and Url', function()
+      collection:setRemoteId(gallery.uuid)
+      collection:setRemoteUrl(gallery.fullurl)
+    end)
   end
   return gallery
 end
@@ -277,10 +291,11 @@ function PhotoDeckAPI.deletePhoto(publishSettings, photoId)
 end
 
 function PhotoDeckAPI.galleryDisplayStyles(urlname)
+  logger:trace('PhotoDeckAPI.galleryDisplayStyles')
   local url = '/websites/' .. urlname .. '/gallery_display_styles.xml'
   local response, headers = PhotoDeckAPI.request('GET', url, { view = 'details' })
   local result = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.galleryDisplayStyles)
-  logger:trace(printTable(result))
+  logger:trace('PhotoDeckAPI.galleryDisplayStyles: ' .. printTable(result))
   return result
 end
 
