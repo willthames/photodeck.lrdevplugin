@@ -1,0 +1,11 @@
+$source = "https://github.com/willthames/photodeck.lrdevplugin/archive/master.zip"
+$destination = ~\Downloads\photodeck-lrdevplugin.zip
+
+Invoke-WebRequest $source -OutFile $destination
+
+$shell = New-Object -com shell.application
+$zip = $shell.NameSpace($destination)
+foreach($item in $zip.items())
+{
+  $shell.Namespace($destination).CopyHere($item, 16)
+}
