@@ -12,6 +12,7 @@ logger:enable('logfile')
 local PhotoDeckAPI = require 'PhotoDeckAPI'
 local PhotoDeckUtils = require 'PhotoDeckUtils'
 local printTable = PhotoDeckUtils.printTable
+local filter = PhotoDeckUtils.filter
 
 local publishServiceProvider = {}
 
@@ -94,7 +95,7 @@ local function chooseGalleryDisplayStyle(propertyTable, collectionInfo)
   local f = LrView.osFactory()
   local c = f:row {
     spacing = f:dialog_spacing(),
-    bind_to_object = propertyTable,
+    bind_to_object = collectionInfo,
     f:popup_menu {
       items = LrView.bind 'galleryDisplayStyles',
       value = LrView.bind { bind_to_object = collectionInfo, key = 'display_style' }
@@ -127,22 +128,24 @@ local function login(propertyTable)
 end
 
 local function onGalleryDisplayStyleSelect(propertyTable, key, value)
-  propertyTable.galleryDisplayStyleName = propertyTable.galleryDisplayStyles[value].title
+  chosenStyle = filter(propertyTable.galleryDisplayStyles, function(v) return v.value == value end)
+  if #chosenStyle > 0 then
+    propertyTable.galleryDisplayStyleName = chosenStyle[1].title
+  end
 end
 
 local function getGalleryDisplayStyles(propertyTable, collectionInfo)
-  propertyTable.galleryDisplayStyles = {}
+  collectionInfo.galleryDisplayStyles = {}
   PhotoDeckAPI.connect(propertyTable.apiKey,
        propertyTable.apiSecret, propertyTable.username, propertyTable.password)
   LrTasks.startAsyncTask(function()
     local galleryDisplayStyles = PhotoDeckAPI.galleryDisplayStyles(propertyTable.websiteChosen)
     for k, v in pairs(galleryDisplayStyles) do
-      table.insert(propertyTable.galleryDisplayStyles, { title = v.name, value = v.uuid })
+      table.insert(collectionInfo.galleryDisplayStyles, { title = v.name, value = v.uuid })
     end
     if collectionInfo.display_style and collectionInfo.display_style ~= '' then
-      onWebsiteSelect(collectionInfo, _, collectionInfo.display_style)
+      onGalleryDisplayStyleSelect(collectionInfo, _, collectionInfo.display_style)
     end
-    logger:trace(printTable(propertyTable.galleryDisplayStyles))
   end, 'PhotoDeckAPI Get Gallery Display Styles')
 end
 
@@ -346,10 +349,6 @@ function publishServiceProvider.processRenderedPhotos( functionContext, exportCo
     gallery = galleries[galleryId]
     galleryPhotos = PhotoDeckAPI.photosInGallery(exportSettings, gallery)
   end
-  exportSession:recordRemoteCollectionId(gallery.uuid)
-  local website = PhotoDeckAPI.websites()[urlname]
-  gallery.fullurl = website.homeurl .. "/-/" .. gallery.fullurlpath
-  exportSession:recordRemoteCollectionUrl(gallery.fullurl)
 
   local photodeckPhotoIdsForRenditions = {}
 
@@ -493,26 +492,25 @@ publishServiceProvider.viewForCollectionSettings = function( f, publishSettings,
         width_in_chars = 30,
       },
       f:push_button {
-        bind_to_object = publishSettings,
+        bind_to_object = info.collectionSettings,
         action = function() chooseGalleryDisplayStyle(publishSettings, info.collectionSettings) end,
         enabled = LrBinding.keyIsNotNil 'galleryDisplayStyles',
         title = "Choose Gallery Style",
       }
     }
   }
-
-  local result = LrDialogs.presentModalDialog({
-    title = LOC "$$$/PhotoDeck/CollectionSetSettings=Gallery Settings",
-    contents = c,
-  })
-  return propertyTable
+  return c
 end
 
-publishServiceProvider.updateCollecionSettings = function( publishSettings, info )
-  gallery = PhotoDeckAPI.createOrUpdateGallery(publishSettings, info.name, info.publishedCollection)
+publishServiceProvider.updateCollectionSettings = function( publishSettings, info )
+  gallery = PhotoDeckAPI.createOrUpdateGallery(publishSettings, info.collectionSettings.LR_liveName, info.publishedCollection)
 end
 
 publishServiceProvider.renamePublishedCollection = function( publishSettings, info )
+  gallery = PhotoDeckAPI.createOrUpdateGallery(publishSettings, info.name, info.publishedCollection)
+end
+
+publishServiceProvider.reparentPublishedCollection = function( publishSettings, info )
   gallery = PhotoDeckAPI.createOrUpdateGallery(publishSettings, info.name, info.publishedCollection)
 end
 
