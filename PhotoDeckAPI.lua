@@ -186,6 +186,7 @@ function PhotoDeckAPI.updateGallery(urlname, uuid, newname, gallery, parentId)
   local galleryInfo = buildGalleryInfo(gallery)
   galleryInfo['gallery[name]'] = newname
   galleryInfo['gallery[parent]'] = parentId
+  galleryInfo['gallery[url_path]'] = string.gsub(newname:lower(), ' ', '-')
   logger:trace(printTable(galleryInfo))
   local response = PhotoDeckAPI.request('PUT', '/websites/' .. urlname .. '/galleries/' .. uuid .. '.xml', galleryInfo)
   logger:trace('PhotoDeckAPI.updateGallery: ' .. response)
@@ -206,13 +207,13 @@ function PhotoDeckAPI.createOrUpdateGallery(publishSettings, name, collectionInf
   -- no idea how to deal with multiple parents as yet
   assert(not collectionInfo.parents or #collectionInfo.parents < 2)
   for _, parent in pairs(collectionInfo.parents) do
+    logger:trace(printTable(parent))
     parentgallery = galleries[parent.remoteCollectionId] or galleries[parent.name]
     if not parentgallery then
       parentgallery = PhotoDeckAPI.createGallery(urlname, parent.name, parent,
           galleries["Galleries"].uuid)
     end
     local parentCollection = collection.catalog:getPublishedCollectionByLocalIdentifier(parent.localCollectionId)
-    logger:trace(printTable(parentCollection))
     parentgallery.fullurl = website.homeurl .. "/-/" .. parentgallery.fullurlpath
     if parentCollection and (not parent.remoteCollectionId or parentCollection:getRemoteId() ~= parent.remoteCollectionId or parentCollection:getRemoteUrl() ~= parentgallery.fullurl) then
       logger:trace('Updating parent remote Id and Url')
@@ -306,6 +307,14 @@ function PhotoDeckAPI.galleryDisplayStyles(urlname)
   local result = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.galleryDisplayStyles)
   logger:trace('PhotoDeckAPI.galleryDisplayStyles: ' .. printTable(result))
   return result
+end
+
+function PhotoDeckAPI.deleteGallery(publishSettings, info)
+  logger:trace('PhotoDeckAPI.deleteGallery')
+  local url = '/websites/' .. publishSettings.websiteChosen .. '/galleries/' .. info.remoteId .. '.xml'
+  logger:trace(url)
+  response, resp_headers = PhotoDeckAPI.request('DELETE', url)
+  logger:trace('PhotoDeckAPI.deleteGallery: ' .. response)
 end
 
 return PhotoDeckAPI

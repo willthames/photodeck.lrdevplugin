@@ -450,7 +450,7 @@ end
 
 -- no idea what actual criteria are
 publishServiceProvider.validatePublishedCollectionName = function( proposedName )
-  return string.match(proposedName, '^[%w:/_-]*$')
+  return string.match(proposedName, '^[%w:/_ -]*$')
 end
 
 publishServiceProvider.viewForCollectionSettings = function( f, publishSettings, info )
@@ -512,6 +512,10 @@ end
 
 publishServiceProvider.reparentPublishedCollection = function( publishSettings, info )
   gallery = PhotoDeckAPI.createOrUpdateGallery(publishSettings, info.name, info)
+end
+
+publishServiceProvider.deletePublishedCollection = function( publishSettings, info )
+  PhotoDeckAPI.deleteGallery(publishSettings, info)
 end
 
 return publishServiceProvider
