@@ -5,7 +5,7 @@ local LrFileUtils = import 'LrFileUtils'
 local LrTasks = import 'LrTasks'
 local LrView = import 'LrView'
 
-local logger = import 'LrLogger'( 'PhotoDeckPublishServiceProvider' )
+local logger = import 'LrLogger'( 'PhotoDeckPublishLightroomPlugin' )
 
 logger:enable('logfile')
 

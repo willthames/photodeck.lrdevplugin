@@ -1,5 +1,5 @@
 local LrXml = import 'LrXml'
-local logger = import 'LrLogger'('PhotoDeckAPIXSLT')
+local logger = import 'LrLogger'( 'PhotoDeckPublishLightroomPlugin' )
 logger:enable('logfile')
 
 local xsltheader = [[
