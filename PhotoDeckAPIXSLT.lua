@@ -65,6 +65,7 @@ return t
 ]] .. xsltfooter
 
 PhotoDeckAPIXSLT.photosInGallery = xsltheader .. [[
+  <xsl:template match='/reply/gallery/*'/>
   <xsl:template match='/reply/gallery/medias'>
 local t = {
     <xsl:for-each select='media'>
@@ -73,7 +74,6 @@ local t = {
 }
 return t
   </xsl:template>
-  <xsl:template match='/reply/gallery/*'/>
 ]] .. xsltfooter
 
 PhotoDeckAPIXSLT.uploadPhoto = xsltheader .. [[

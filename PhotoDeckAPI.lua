@@ -200,10 +200,12 @@ function PhotoDeckAPI.photosInGallery(exportSettings, gallery)
   local medias = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.photosInGallery)
   -- turn it into a set for ease of testing inclusion
   local mediaSet = {}
-  for _, v in pairs(medias) do
-    mediaSet[v] = v
+  if medias then
+    for _, v in pairs(medias) do
+      mediaSet[v] = v
+    end
   end
-  logger:trace(printTable(mediaSet))
+  logger:trace("PhotoDeckAPI.photosInGallery: " .. printTable(mediaSet))
   return mediaSet
 end
 
