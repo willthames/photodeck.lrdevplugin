@@ -1,4 +1,4 @@
--- local LrMobdebug = import 'LrMobdebug'
+local LrApplication = import 'LrApplication'
 local LrBinding = import 'LrBinding'
 local LrDialogs = import 'LrDialogs'
 local LrFileUtils = import 'LrFileUtils'
@@ -13,6 +13,7 @@ local PhotoDeckAPI = require 'PhotoDeckAPI'
 local PhotoDeckUtils = require 'PhotoDeckUtils'
 local printTable = PhotoDeckUtils.printTable
 local filter = PhotoDeckUtils.filter
+local map = PhotoDeckUtils.map
 
 local publishServiceProvider = {}
 
@@ -128,7 +129,7 @@ local function login(propertyTable)
 end
 
 local function onGalleryDisplayStyleSelect(propertyTable, key, value)
-  chosenStyle = filter(propertyTable.galleryDisplayStyles, function(v) return v.value == value end)
+  local chosenStyle = filter(propertyTable.galleryDisplayStyles, function(v) return v.value == value end)
   if #chosenStyle > 0 then
     propertyTable.galleryDisplayStyleName = chosenStyle[1].title
   end
@@ -144,7 +145,7 @@ local function getGalleryDisplayStyles(propertyTable, collectionInfo)
       table.insert(collectionInfo.galleryDisplayStyles, { title = v.name, value = v.uuid })
     end
     if collectionInfo.display_style and collectionInfo.display_style ~= '' then
-      onGalleryDisplayStyleSelect(collectionInfo, _, collectionInfo.display_style)
+      onGalleryDisplayStyleSelect(collectionInfo, nil, collectionInfo.display_style)
     end
   end, 'PhotoDeckAPI Get Gallery Display Styles')
 end
@@ -162,7 +163,7 @@ local function getWebsites(propertyTable)
       table.insert(propertyTable.websiteChoices, { title = v.title, value = k })
     end
     if propertyTable.websiteChosen and propertyTable.websiteChosen ~= '' then
-      onWebsiteSelect(propertyTable, _, propertyTable.websiteChosen)
+      onWebsiteSelect(propertyTable, nil, propertyTable.websiteChosen)
     end
   end, 'PhotoDeckAPI Get Websites')
 end
@@ -334,37 +335,17 @@ function publishServiceProvider.processRenderedPhotos( functionContext, exportCo
   local uploadedPhotoIds = {}
   local collectionInfo = exportContext.publishedCollectionInfo
   -- Look for a gallery id for this collection.
-  local galleryId = publishedCollection:getRemoteId()
+  local galleryId = collectionInfo.remoteId
   local galleryPhotos
   local gallery
   local urlname = exportSettings.websiteChosen
+  local galleries = PhotoDeckAPI.galleries(urlname)
 
   if not galleryId then
     -- Create or update this gallery.
     gallery = PhotoDeckAPI.createOrUpdateGallery(exportSettings, collectionInfo.name, collectionInfo)
   else
-    -- Get a list of photos already in this gallery so we know which ones we can replace and which have
-    -- to be re-uploaded entirely.
-    local galleries = PhotoDeckAPI.galleries(urlname)
     gallery = galleries[galleryId]
-    galleryPhotos = PhotoDeckAPI.photosInGallery(exportSettings, gallery)
-  end
-
-  local photodeckPhotoIdsForRenditions = {}
-
-  -- Gather photodeck photo IDs, and if we're on a free account, remember the renditions that
-  -- had been previously published.
-
-  for i, rendition in exportContext.exportSession:renditions() do
-    local photodeckPhotoId = rendition.publishedPhotoId
-    if photodeckPhotoId then
-      -- Check to see if the photo is still on PhotoDeck.
-      if not galleryPhotos[ photodeckPhotoId ] then
-        photodeckPhotoId = nil
-      end
-    end
-
-    photodeckPhotoIdsForRenditions[ rendition ] = photodeckPhotoId
   end
 
   -- Iterate through photo renditions.
@@ -375,7 +356,7 @@ function publishServiceProvider.processRenderedPhotos( functionContext, exportCo
     local photo = rendition.photo
 
     -- See if we previously uploaded this photo.
-    local photodeckPhotoId = photodeckPhotoIdsForRenditions[ rendition ]
+    local photodeckPhotoId = rendition.publishedPhotoId or uploadedPhotoIds[photo.localIdentifier]
 
     if not rendition.wasSkipped then
       local success, pathOrMessage = rendition:waitForRender()
@@ -385,51 +366,35 @@ function publishServiceProvider.processRenderedPhotos( functionContext, exportCo
       if progressScope:isCanceled() then break end
       if success then
         -- Build up common metadata for this photo.
-        local description = photo:getFormattedMetadata( 'caption' )
-        local keywordTags = photo:getFormattedMetadata( 'keywordTagsForExport' )
-        local tags = {}
+        local upload
 
-        if keywordTags then
-          local keywordIter = string.gfind( keywordTags, "[^,]+" )
-          for keyword in keywordIter do
-            if string.sub( keyword, 1, 1 ) == ' ' then
-              keyword = string.sub( keyword, 2, -1 )
-            end
-
-            if string.find( keyword, ' ' ) ~= nil then
-              keyword = '"' .. keyword .. '"'
-            end
-
-            tags[ #tags + 1 ] = keyword
-          end
-        end
-
+        if photodeckPhotoId and photodeckPhotoId ~= '' then
+          upload = PhotoDeckAPI.updatePhoto( exportSettings, {
+            filePath = pathOrMessage,
+            gallery = gallery,
+            uuid = photodeckPhotoId,
+          })
+        else
         -- Upload or replace the photo.
-        local upload = PhotoDeckAPI.uploadPhoto( exportSettings, {
-          filePath = pathOrMessage,
-          gallery = gallery,
-          replace = photodeckPhotoId and 1 or 0,
-        })
-
-        -- Use the below code once we know what we want to update
-        --[[
-        PhotoDeckAPI.updatePhoto(exportSettings, upload, {
-          description = description,
-          tags = table.concat( tags, ',' ),
-        })
-        --]]
+          upload = PhotoDeckAPI.uploadPhoto( exportSettings, {
+            filePath = pathOrMessage,
+            gallery = gallery,
+          })
+        end
 
         -- When done with photo, delete temp file. There is a cleanup step that happens later,
         -- but this will help manage space in the event of a large upload.
         LrFileUtils.delete( pathOrMessage )
 
         -- Remember this in the list of photos we uploaded.
-        uploadedPhotoIds[ #uploadedPhotoIds + 1 ] = upload.uuid
+        uploadedPhotoIds[photo.localIdentifier] = upload.uuid
 
         -- Record this PhotoDeck ID with the photo so we know to replace instead of upload.
         rendition:recordPublishedPhotoId( upload.uuid )
         -- Add the uploaded photos to the correct gallery.
-        rendition:recordPublishedPhotoUrl( upload.url )
+        if upload.url then
+          rendition:recordPublishedPhotoUrl( upload.url )
+        end
       end
     end
   end
@@ -440,11 +405,19 @@ end
 
 publishServiceProvider.deletePhotosFromPublishedCollection = function( publishSettings, arrayOfPhotoIds, deletedCallback, localCollectionId )
   PhotoDeckAPI.connect(publishSettings.apiKey, publishSettings.apiSecret, publishSettings.username, publishSettings.password)
+  logger:trace('deletePhotosFromPublishedCollection')
+  local catalog = LrApplication.activeCatalog()
+  local collection = catalog:getPublishedCollectionByLocalIdentifier(localCollectionId)
+  -- this next bit is stupid. Why is there no catalog:getPhotoByRemoteId or similar
+  local publishedPhotos = collection:getPublishedPhotos()
+  local publishedPhotoById = {}
+  for _, pp in pairs(publishedPhotos) do
+    publishedPhotoById[pp:getRemoteId()] = pp
+  end
   for i, photoId in ipairs( arrayOfPhotoIds ) do
-
-    PhotoDeckAPI.deletePhoto(publishSettings, photoId)
+    local publishedPhoto = publishedPhotoById[photoId]
+    PhotoDeckAPI.removePhotoFromCollection(publishSettings, publishedPhoto, collection)
     deletedCallback( photoId )
-
   end
 end
 
@@ -456,7 +429,7 @@ end
 publishServiceProvider.viewForCollectionSettings = function( f, publishSettings, info )
   info.collectionSettings:addObserver('display_style', onGalleryDisplayStyleSelect)
   getGalleryDisplayStyles(publishSettings, info.collectionSettings)
-  c = f:view {
+  local c = f:view {
     bind_to_object = info,
     spacing = f:dialog_spacing(),
 
@@ -503,15 +476,19 @@ publishServiceProvider.viewForCollectionSettings = function( f, publishSettings,
 end
 
 publishServiceProvider.updateCollectionSettings = function( publishSettings, info )
-  gallery = PhotoDeckAPI.createOrUpdateGallery(publishSettings, info.collectionSettings.LR_liveName, info)
+  PhotoDeckAPI.createOrUpdateGallery(publishSettings, info.collectionSettings.LR_liveName, info)
+end
+
+publishServiceProvider.updateCollectionSetSettings = function( publishSettings, info )
+  PhotoDeckAPI.createOrUpdateGallery(publishSettings, info.name, info)
 end
 
 publishServiceProvider.renamePublishedCollection = function( publishSettings, info )
-  gallery = PhotoDeckAPI.createOrUpdateGallery(publishSettings, info.name, info)
+  PhotoDeckAPI.createOrUpdateGallery(publishSettings, info.name, info)
 end
 
 publishServiceProvider.reparentPublishedCollection = function( publishSettings, info )
-  gallery = PhotoDeckAPI.createOrUpdateGallery(publishSettings, info.name, info)
+  PhotoDeckAPI.createOrUpdateGallery(publishSettings, info.name, info)
 end
 
 publishServiceProvider.deletePublishedCollection = function( publishSettings, info )

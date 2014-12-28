@@ -77,17 +77,20 @@ return t
 ]] .. xsltfooter
 
 PhotoDeckAPIXSLT.uploadPhoto = xsltheader .. [[
-  <xsl:template match='/reply/media'>
+  <xsl:template match='/reply/message'/>
+  <xsl:template match='/reply'>
 local t = {
-  uuid =  "<xsl:value-of select='uuid'/>",
-  path =  "<xsl:value-of select='url'/>",
+  uuid =  "<xsl:value-of select='media-uuid'/>",
+  path =  "<xsl:value-of select='location'/>",
 }
 return t
   </xsl:template>
+]] .. xsltfooter
+
+PhotoDeckAPIXSLT.updatePhoto = xsltheader .. [[
   <xsl:template match='/reply'>
 local t = {
-  uuid = "<xsl:value-of select='media-uuid'/>",
-  path = "<xsl:value-of select='location'/>",
+  uuid =  "<xsl:value-of select='media-uuid'/>",
 }
 return t
   </xsl:template>

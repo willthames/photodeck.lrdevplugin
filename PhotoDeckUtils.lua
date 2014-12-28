@@ -31,7 +31,7 @@ function PhotoDeckUtils.toString(v)
   if PhotoDeckUtils.isFunction(v) then
     return 'function'
   end
-  return v
+  return tostring(v)
 end
 
 function PhotoDeckUtils.printTable(t)

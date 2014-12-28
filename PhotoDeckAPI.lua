@@ -1,8 +1,7 @@
 local LrDate = import 'LrDate'
 local LrDigest = import 'LrDigest'
-local LrDialogs = import 'LrDialogs'
+local LrFileUtils = import 'LrFileUtils'
 local LrHttp = import 'LrHttp'
-local LrTasks = import 'LrTasks'
 local LrStringUtils = import 'LrStringUtils'
 local LrXml = import 'LrXml'
 local PhotoDeckUtils = require 'PhotoDeckUtils'
@@ -13,11 +12,9 @@ logger:enable('logfile')
 
 local urlprefix = 'http://api.photodeck.com'
 local isTable = PhotoDeckUtils.isTable
-local isString = PhotoDeckUtils.isString
 local printTable = PhotoDeckUtils.printTable
 
 local PhotoDeckAPI = {}
-
 
 -- sign API request according to docs at
 -- http://www.photodeck.com/developers/get-started/
@@ -51,22 +48,48 @@ local function auth_headers(method, uri, querystring)
   return headers
 end
 
+-- extra chars from http://tools.ietf.org/html/rfc3986#section-2.2
+local function urlencode (s)
+  s = string.gsub(s, "([][:/?#@!#'()*,;&=+%c])", function (c)
+         return string.format("%%%02X", string.byte(c))
+      end)
+  s = string.gsub(s, " ", "+")
+  return s
+end
+
+local function table_to_mime_multipart(data, boundary)
+  assert(PhotoDeckUtils.isTable(data))
+  local result = ''
+  for _, v in pairs(data) do
+    result = result .. '--' .. boundary .. "\n"
+    result = result .. 'Content-Disposition: form-data; name="' .. v.name .. '"'
+    if v.fileName then
+      result = result .. ';filename="' .. v.fileName ..'"'
+    end
+    result = result .. "\n"
+    if v.contentType then
+      result = result .. "Content-Type: " .. v.contentType .. "\n"
+    end
+    result = result .. "\n"
+    if v.filePath then
+      result = result .. LrFileUtils.readFile(v.filePath) .. "\n"
+    else
+      result = result .. v.value .. "\n"
+    end
+  end
+  result = result .. '--' .. boundary .. '--' .. "\n"
+  -- logger:trace(string.gsub(result, "[^%w %p]+", '.'))
+  return result
+end
+
 -- convert lua table to url encoded data
 -- from http://www.lua.org/pil/20.3.html
--- extra chars from http://tools.ietf.org/html/rfc3986#section-2.2
 local function table_to_querystring(data)
   assert(PhotoDeckUtils.isTable(data))
-  local function escape (s)
-    s = string.gsub(s, "([][:/?#@!#'()*,;&=+%c])", function (c)
-           return string.format("%%%02X", string.byte(c))
-        end)
-    s = string.gsub(s, " ", "+")
-    return s
-  end
 
   local s = ""
   for k,v in pairs(data) do
-    s = s .. "&" .. escape(k) .. "=" .. escape(v)
+    s = s .. "&" .. urlencode(k) .. "=" .. urlencode(v)
   end
   return string.sub(s, 2)     -- remove first `&'
 end
@@ -74,7 +97,7 @@ end
 local function handle_errors(response, resp_headers)
   local status = PhotoDeckUtils.filter(resp_headers, function(v) return isTable(v) and v.field == 'Status' end)[1]
 
-  if status.value > "400" then
+  if not status or status.value > "400" then
     logger:error("Bad response: " .. response)
     logger:error(PhotoDeckUtils.printLrTable(resp_headers))
     -- raise this up to the user at this point?
@@ -261,43 +284,73 @@ function PhotoDeckAPI.uploadPhoto( exportSettings, t)
   -- set up authorisation headers request
   local headers = auth_headers('POST', '/medias.xml')
   local content = {
-    { name = 'media[publish_to_galleries]', value = t.gallery.uuid },
-    { name = 'media[replace]', value = PhotoDeckUtils.toString(t.replace) },
+    { name = 'media[replace]', value = "1" },
     { name = 'media[content]', filePath = t.filePath,
       fileName = PhotoDeckUtils.basename(t.filePath), contentType = 'image/jpeg' },
+    { name = 'media[publish_to_galleries]', value = t.gallery.uuid }
   }
   logger:trace('PhotoDeckAPI.uploadPhoto: ' .. printTable(content))
   local response, resp_headers = LrHttp.postMultipart(urlprefix .. '/medias.xml', content, headers)
   handle_errors(response, resp_headers)
   local media = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.uploadPhoto)
   logger:trace('PhotoDeckAPI.uploadPhoto: ' .. printTable(media))
-  media.url = t.gallery.fullurl .. "/-/medias/" .. media.uuid
-
+  media.url = t.gallery.fullurlpath .. "/-/medias/" .. media.uuid
   return media
 end
 
-function PhotoDeckAPI.updatePhoto(exportSettings, uuid, t)
-  logger:trace('PhotoDeckAPI.updatePhoto')
-  -- set up authorisation headers request
-  local headers = auth_headers('POST', '/medias/' .. uuid .. '.xml')
-  local content = {}
-  for k, v in pairs(t) do
-    if k == 'content' then
-      table.insert(content, { name = 'media[content]', filePath = t.content,
-                              fileName = PhotoDeckUtils.basename(t.content),
-                              contentType = 'image/jpeg' })
-    else
-      table.insert(content, { name = 'media[' .. k .. ']', value = v})
-    end
-  end
-  response, resp_headers = LrHttp.postMultipart(urlprefix .. '/medias/' .. uuid .. '.xml', content, headers)
+local function multipartRequest(url, content, method)
+  local headers = auth_headers(method, url)
+  -- boundary just needs to be sufficiently unique to be unlikely to appear in the file content
+  local boundary = LrDigest.SHA256.digest(tostring(LrDate.currentTime()))
+  table.insert(headers, { field = 'Content-Type', value = 'multipart/form-data; boundary=' .. boundary })
+  local data = table_to_mime_multipart(content, boundary)
+  --logger:trace('PhotoDeckAPI.updatePhoto: ' .. string.gsub(data, "[^%w%s%p]+", '.'))
+  local response, resp_headers = LrHttp.post(urlprefix .. url, data, headers, 'PUT')
   handle_errors(response, resp_headers)
+  return response
+end
+
+function PhotoDeckAPI.updatePhoto( exportSettings, t)
+  logger:trace('PhotoDeckAPI.updatePhoto: ' .. printTable(t))
+  -- set up authorisation headers request
+  local url = '/medias/' .. t.uuid .. '.xml'
+  local content = {
+    { name = 'media[content]', filePath = t.filePath,
+      fileName = PhotoDeckUtils.basename(t.filePath), contentType = 'image/jpeg' },
+    { name = 'media[publish_to_galleries]', value = t.gallery.uuid }
+  }
+  logger:trace('PhotoDeckAPI.updatePhoto: ' .. printTable(content))
+  local response = multipartRequest(url, content, 'PUT')
+  local media = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.updatePhoto)
+  media.url = t.gallery.fullurlpath .. "/-/medias/" .. media.uuid
+  return media
 end
 
 function PhotoDeckAPI.deletePhoto(publishSettings, photoId)
   logger:trace('PhotoDeckAPI.deletePhoto')
-  response, resp_headers = PhotoDeckAPI.request('DELETE', '/medias/' .. photoId .. '.xml')
+  local response, resp_headers = PhotoDeckAPI.request('DELETE', '/medias/' .. photoId .. '.xml')
   logger:trace('PhotoDeckAPI.deletePhoto: ' .. response)
+end
+
+function PhotoDeckAPI.removePhotoFromCollection(publishSettings, publishedPhoto, collection)
+  logger:trace('PhotoDeckAPI.removePhotoFromCollection')
+  -- delete photo if this is the only collection it's in
+  local photoId = publishedPhoto:getRemoteId()
+  local collCount = 0
+  for _, c in pairs(publishedPhoto:getPhoto():getContainedPublishedCollections()) do
+    if c:getRemoteId() ~= collection:getRemoteId() then
+      collCount = collCount + 1
+    end
+  end
+  if collCount == 0 then
+    PhotoDeckAPI.deletePhoto(publishSettings, photoId)
+    return
+  end
+  -- otherwise unpublish from the passed in collection
+  local url = '/medias/' .. photoId .. '.xml'
+  local content = { { name = 'media[unpublish_from_galleries]', value = collection:getRemoteId() } }
+  local response = multipartRequest(url, content, 'PUT')
+  logger:trace('PhotoDeckAPI.removePhotoFromCollection: ' .. response)
 end
 
 function PhotoDeckAPI.galleryDisplayStyles(urlname)
@@ -313,7 +366,7 @@ function PhotoDeckAPI.deleteGallery(publishSettings, info)
   logger:trace('PhotoDeckAPI.deleteGallery')
   local url = '/websites/' .. publishSettings.websiteChosen .. '/galleries/' .. info.remoteId .. '.xml'
   logger:trace(url)
-  response, resp_headers = PhotoDeckAPI.request('DELETE', url)
+  local response, resp_headers = PhotoDeckAPI.request('DELETE', url)
   logger:trace('PhotoDeckAPI.deleteGallery: ' .. response)
 end
 
