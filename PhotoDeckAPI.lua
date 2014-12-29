@@ -302,6 +302,7 @@ end
 function PhotoDeckAPI.uploadPhoto( exportSettings, t)
   logger:trace('PhotoDeckAPI.uploadPhoto')
   -- set up authorisation headers request
+  local website = PhotoDeckAPI.websites()[exportSettings.websiteChosen]
   local headers = auth_headers('POST', '/medias.xml')
   local content = {
     { name = 'media[replace]', value = "1" },
@@ -313,8 +314,8 @@ function PhotoDeckAPI.uploadPhoto( exportSettings, t)
   local response, resp_headers = LrHttp.postMultipart(urlprefix .. '/medias.xml', content, headers)
   handle_errors(response, resp_headers)
   local media = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.uploadPhoto)
+  media.url = website.homeurl .. '/-/' .. t.gallery.fullurlpath .. "/-/medias/" .. media.uuid
   logger:trace('PhotoDeckAPI.uploadPhoto: ' .. printTable(media))
-  media.url = t.gallery.fullurlpath .. "/-/medias/" .. media.uuid
   return media
 end
 
@@ -333,6 +334,7 @@ end
 function PhotoDeckAPI.updatePhoto( exportSettings, t)
   logger:trace('PhotoDeckAPI.updatePhoto: ' .. printTable(t))
   -- set up authorisation headers request
+  local website = PhotoDeckAPI.websites()[exportSettings.websiteChosen]
   local url = '/medias/' .. t.uuid .. '.xml'
   local content = {
     { name = 'media[content]', filePath = t.filePath,
@@ -342,7 +344,8 @@ function PhotoDeckAPI.updatePhoto( exportSettings, t)
   logger:trace('PhotoDeckAPI.updatePhoto: ' .. printTable(content))
   local response = multipartRequest(url, content, 'PUT')
   local media = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.updatePhoto)
-  media.url = t.gallery.fullurlpath .. "/-/medias/" .. media.uuid
+  media.url = website.homeurl .. '/-/' .. t.gallery.fullurlpath .. "/-/medias/" .. media.uuid
+  logger:trace('PhotoDeckAPI.updatePhoto: ' .. printTable(media))
   return media
 end
 

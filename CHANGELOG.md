@@ -2,6 +2,7 @@
 --------------------
 Fix republishing deleted photos
 Add getPhoto API to give some details of photos, including contents
+Correct published URLs for photos
 
 0.7 - 28/12/2014
 ----------------
