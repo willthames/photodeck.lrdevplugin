@@ -1,3 +1,8 @@
+0.8 - 29/12/2014
+--------------------
+Fix republishing deleted photos
+Add getPhoto API to give some details of photos, including contents
+
 0.7 - 28/12/2014
 ----------------
 A single photo can be in multiple galleries. Changes to those photos should propagate

@@ -64,6 +64,35 @@ return t
   </xsl:template>
 ]] .. xsltfooter
 
+PhotoDeckAPIXSLT.getPhoto = xsltheader .. [[
+  <xsl:template match='/reply/media'>
+local t = {
+  uuid = "<xsl:value-of select='uuid'/>",
+  filename = "<xsl:value-of select='file-name'/>",
+  title = "<xsl:value-of select='title'/>",
+  description = "<xsl:value-of select='description'/>",
+  <xsl:apply-templates select='keywords'/>
+  <xsl:apply-templates select='galleries'/>
+}
+return t
+  </xsl:template>
+  <xsl:template match='galleries'>
+  galleries = {
+    <xsl:for-each select='gallery'>
+    "<xsl:value-of select='uuid'/>",
+    </xsl:for-each>
+  },
+  </xsl:template>
+  <xsl:template match='keywords'>
+  keywords = {
+    <xsl:for-each select='keyword'>
+    "<xsl:value-of select='.'/>",
+    </xsl:for-each>
+  },
+  </xsl:template>
+]] .. xsltfooter
+
+
 PhotoDeckAPIXSLT.photosInGallery = xsltheader .. [[
   <xsl:template match='/reply/gallery/*'/>
   <xsl:template match='/reply/gallery/medias'>

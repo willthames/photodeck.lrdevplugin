@@ -94,19 +94,23 @@ local function table_to_querystring(data)
   return string.sub(s, 2)     -- remove first `&'
 end
 
-local function handle_errors(response, resp_headers)
+local function handle_errors(response, resp_headers, onerror)
   local status = PhotoDeckUtils.filter(resp_headers, function(v) return isTable(v) and v.field == 'Status' end)[1]
 
   if not status or status.value > "400" then
+    if onerror and onerror[status] then
+      return onerror[status]()
+    end
     logger:error("Bad response: " .. response)
     logger:error(PhotoDeckUtils.printLrTable(resp_headers))
     -- raise this up to the user at this point?
   end
+  return response
 end
 
 -- make HTTP GET request to PhotoDeck API
 -- must be called within an LrTask
-function PhotoDeckAPI.request(method, uri, data)
+function PhotoDeckAPI.request(method, uri, data, onerror)
   local querystring = ''
   local body = ''
   if data then
@@ -135,9 +139,9 @@ function PhotoDeckAPI.request(method, uri, data)
     result, resp_headers = LrHttp.post(fullurl, body, headers, method)
   end
 
-  handle_errors(result, resp_headers)
+  result = handle_errors(result, resp_headers, onerror)
 
-  return result
+  return result, resp_headers
 end
 
 function PhotoDeckAPI.connect(key, secret, username, password)
@@ -261,6 +265,22 @@ function PhotoDeckAPI.createOrUpdateGallery(publishSettings, name, collectionInf
     end)
   end
   return gallery
+end
+
+-- getPhoto returns a photo with remote ID uuid, or nil if it does not exist
+function PhotoDeckAPI.getPhoto(uuid)
+  logger:trace('PhotoDeckAPI.getPhoto')
+  local url = '/medias/' .. uuid .. '.xml'
+  local onerror = {}
+  onerror["404"] = function() return nil end
+  local response = PhotoDeckAPI.request('GET', url, nil, onerror)
+  if not response then
+    return response
+  else
+    local result = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.getPhoto)
+    logger:trace('PhotoDeckAPI.getPhoto: ' .. printTable(result))
+    return result
+  end
 end
 
 function PhotoDeckAPI.photosInGallery(exportSettings, gallery)

@@ -365,17 +365,16 @@ function publishServiceProvider.processRenderedPhotos( functionContext, exportCo
       -- Check for cancellation again after photo has been rendered.
       if progressScope:isCanceled() then break end
       if success then
-        -- Build up common metadata for this photo.
+        -- Upload or replace the photo.
         local upload
 
-        if photodeckPhotoId and photodeckPhotoId ~= '' then
+        if photodeckPhotoId and PhotoDeckAPI.getPhoto(photodeckPhotoId) then
           upload = PhotoDeckAPI.updatePhoto( exportSettings, {
             filePath = pathOrMessage,
             gallery = gallery,
             uuid = photodeckPhotoId,
           })
         else
-        -- Upload or replace the photo.
           upload = PhotoDeckAPI.uploadPhoto( exportSettings, {
             filePath = pathOrMessage,
             gallery = gallery,
