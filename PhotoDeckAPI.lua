@@ -98,8 +98,9 @@ local function handle_errors(response, resp_headers, onerror)
   local status = PhotoDeckUtils.filter(resp_headers, function(v) return isTable(v) and v.field == 'Status' end)[1]
 
   if not status or status.value > "400" then
-    if onerror and onerror[status] then
-      return onerror[status]()
+    local statuscode = string.sub(status.value, 1, 3)
+    if onerror and onerror[statuscode] then
+      return onerror[statuscode]()
     end
     logger:error("Bad response: " .. response)
     logger:error(PhotoDeckUtils.printLrTable(resp_headers))
