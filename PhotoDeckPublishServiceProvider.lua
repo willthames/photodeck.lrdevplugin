@@ -348,6 +348,16 @@ function publishServiceProvider.processRenderedPhotos( functionContext, exportCo
     gallery = galleries[galleryId]
   end
 
+  -- gather information for dealing with recordPublishedPhotoUrl bug
+  local catalog = exportSession.catalog
+  local collection = exportContext.publishedCollection
+  -- this next bit is stupid. Why is there no catalog:getPhotoByRemoteId or similar
+  local publishedPhotos = collection:getPublishedPhotos()
+  local publishedPhotoById = {}
+  for _, pp in pairs(publishedPhotos) do
+    publishedPhotoById[pp:getRemoteId()] = pp
+  end
+
   -- Iterate through photo renditions.
   for i, rendition in exportContext:renditions { stopIfCanceled = true } do
     -- Update progress scope.
@@ -388,12 +398,14 @@ function publishServiceProvider.processRenderedPhotos( functionContext, exportCo
         -- Remember this in the list of photos we uploaded.
         uploadedPhotoIds[photo.localIdentifier] = upload.uuid
 
-        -- Record this PhotoDeck ID with the photo so we know to replace instead of upload.
-        rendition:recordPublishedPhotoId( upload.uuid )
-        -- Add the uploaded photos to the correct gallery.
-        if upload.url then
-          rendition:recordPublishedPhotoUrl( upload.url )
+        -- Record this PhotoDeck ID with the photo
+        if publishedPhotoById[upload.uuid] then
+          logger:trace(printTable(upload))
+          publishedPhoto = publishedPhotoById[upload.uuid]:getPhoto()
+          logger:trace(printTable(publishedPhoto:getFormattedMetadata()))
         end
+        rendition:recordPublishedPhotoId( upload.uuid )
+        rendition:recordPublishedPhotoUrl( upload.url )
       end
     end
   end
