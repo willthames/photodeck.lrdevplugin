@@ -15,6 +15,7 @@ local isTable = PhotoDeckUtils.isTable
 local printTable = PhotoDeckUtils.printTable
 
 local PhotoDeckAPI = {}
+local PhotoDeckAPICache = {}
 
 -- sign API request according to docs at
 -- http://www.photodeck.com/developers/get-started/
@@ -179,9 +180,13 @@ end
 
 function PhotoDeckAPI.websites()
   logger:trace('PhotoDeckAPI.websites')
-  local response, headers = PhotoDeckAPI.request('GET', '/websites.xml', { view = 'details' })
-  local result = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.websites)
-  -- logger:trace(printTable(result))
+  local result = PhotoDeckAPICache['websites']
+  if not result then
+    local response, headers = PhotoDeckAPI.request('GET', '/websites.xml', { view = 'details' })
+    result = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.websites)
+    PhotoDeckAPICache['websites'] = result
+    -- logger:trace(printTable(result))
+  end
   return result
 end
 
