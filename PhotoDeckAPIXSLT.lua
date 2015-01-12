@@ -28,16 +28,15 @@ return t
 
 PhotoDeckAPIXSLT.websites = xsltheader .. [[
   <xsl:template match='/reply/websites'>
+local t = {}
     <xsl:for-each select='website'>
-local t = { <xsl:value-of select='urlname'/> =
-  {
+t["<xsl:value-of select='urlname'/>"] = {
      hostname = "<xsl:value-of select='hostname'/>",
      homeurl = "<xsl:value-of select='home-url'/>",
      title = "<xsl:value-of select='title'/>",
-  },
 }
-return t
     </xsl:for-each>
+return t
   </xsl:template>
 ]] .. xsltfooter
 
