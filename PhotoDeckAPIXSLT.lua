@@ -63,6 +63,27 @@ return t
   </xsl:template>
 ]] .. xsltfooter
 
+PhotoDeckAPIXSLT.gallery = xsltheader .. [[
+  <xsl:template match='/reply/gallery'>
+local t = {
+     fullurlpath = "<xsl:value-of select='full-url-path'/>",
+     name = "<xsl:value-of select='name'/>",
+     uuid = "<xsl:value-of select='uuid'/>",
+     urlpath = "<xsl:value-of select='url-path'/>",
+}
+return t
+  </xsl:template>
+]] .. xsltfooter
+
+PhotoDeckAPIXSLT.createGallery = xsltheader .. [[
+  <xsl:template match='/reply'>
+local t = {
+     uuid = "<xsl:value-of select='gallery-uuid'/>",
+}
+return t
+  </xsl:template>
+]] .. xsltfooter
+
 PhotoDeckAPIXSLT.getPhoto = xsltheader .. [[
   <xsl:template match='/reply/media'>
 local t = {

@@ -198,6 +198,14 @@ function PhotoDeckAPI.galleries(urlname)
   return result
 end
 
+function PhotoDeckAPI.gallery(urlname, galleryId)
+  logger:trace('PhotoDeckAPI.gallery')
+  local response, headers = PhotoDeckAPI.request('GET', '/websites/' .. urlname .. '/galleries/' .. galleryId .. '.xml', { view = 'details' })
+  local result = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.gallery)
+  -- logger:trace(printTable(result))
+  return result
+end
+
 local function buildGalleryInfo(gallery)
   local galleryInfo = {}
   if gallery.getCollectionInfoSummary then
@@ -214,9 +222,10 @@ function PhotoDeckAPI.createGallery(urlname, name, gallery, parentId)
   galleryInfo['gallery[parent]'] = parentId
   galleryInfo['gallery[name]'] = name
   logger:trace(printTable(galleryInfo))
-  PhotoDeckAPI.request('POST', '/websites/' .. urlname .. '/galleries.xml', galleryInfo)
-  local galleries = PhotoDeckAPI.galleries(urlname)
-  return galleries[name]
+  local response, headers = PhotoDeckAPI.request('POST', '/websites/' .. urlname .. '/galleries.xml', galleryInfo)
+  local result = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.createGallery)
+  local gallery = PhotoDeckAPI.gallery(urlname, result['uuid'])
+  return gallery
 end
 
 function PhotoDeckAPI.updateGallery(urlname, uuid, newname, gallery, parentId)
@@ -228,8 +237,8 @@ function PhotoDeckAPI.updateGallery(urlname, uuid, newname, gallery, parentId)
   logger:trace(printTable(galleryInfo))
   local response = PhotoDeckAPI.request('PUT', '/websites/' .. urlname .. '/galleries/' .. uuid .. '.xml', galleryInfo)
   logger:trace('PhotoDeckAPI.updateGallery: ' .. response)
-  local galleries = PhotoDeckAPI.galleries(urlname)
-  return galleries[newname]
+  local gallery = PhotoDeckAPI.gallery(urlname, uuid)
+  return gallery
 end
 
 
