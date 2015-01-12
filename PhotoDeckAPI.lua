@@ -311,7 +311,6 @@ function PhotoDeckAPI.uploadPhoto( exportSettings, t)
   local website = PhotoDeckAPI.websites()[exportSettings.websiteChosen]
   local headers = auth_headers('POST', '/medias.xml')
   local content = {
-    { name = 'media[replace]', value = "1" },
     { name = 'media[content]', filePath = t.filePath,
       fileName = PhotoDeckUtils.basename(t.filePath), contentType = 'image/jpeg' },
     { name = 'media[publish_to_galleries]', value = t.gallery.uuid }
