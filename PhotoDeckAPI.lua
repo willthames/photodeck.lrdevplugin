@@ -247,7 +247,14 @@ function PhotoDeckAPI.createOrUpdateGallery(publishSettings, name, collectionInf
   local urlname = publishSettings.websiteChosen
   local website = PhotoDeckAPI.websites()[urlname]
   local galleries = PhotoDeckAPI.galleries(urlname)
-  local parentgallery = galleries["Galleries"]
+  local rootgallery = nil
+  for _, gallery in pairs(galleries) do
+    if not gallery['parentuuid'] or gallery['parentuuid'] == "" then
+      rootgallery = gallery
+      break
+    end
+  end
+  local parentgallery = rootgallery
   local collection = collectionInfo.publishedCollection
   -- prefer remote Id, particularly for renames, but optionally defer to name
   local gallery = galleries[collection:getRemoteId()] or galleries[name]
@@ -258,7 +265,7 @@ function PhotoDeckAPI.createOrUpdateGallery(publishSettings, name, collectionInf
     parentgallery = galleries[parent.remoteCollectionId] or galleries[parent.name]
     if not parentgallery then
       parentgallery = PhotoDeckAPI.createGallery(urlname, parent.name, parent,
-          galleries["Galleries"].uuid)
+          rootgallery.uuid)
     end
     local parentCollection = collection.catalog:getPublishedCollectionByLocalIdentifier(parent.localCollectionId)
     parentgallery.fullurl = website.homeurl .. "/-/" .. parentgallery.fullurlpath
