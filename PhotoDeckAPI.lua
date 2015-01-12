@@ -397,10 +397,14 @@ end
 
 function PhotoDeckAPI.galleryDisplayStyles(urlname)
   logger:trace('PhotoDeckAPI.galleryDisplayStyles')
-  local url = '/websites/' .. urlname .. '/gallery_display_styles.xml'
-  local response, headers = PhotoDeckAPI.request('GET', url, { view = 'details' })
-  local result = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.galleryDisplayStyles)
-  logger:trace('PhotoDeckAPI.galleryDisplayStyles: ' .. printTable(result))
+  local result = PhotoDeckAPICache['gallery_display_styles/' .. urlname]
+  if not result then
+    local url = '/websites/' .. urlname .. '/gallery_display_styles.xml'
+    local response, headers = PhotoDeckAPI.request('GET', url, { view = 'details' })
+    result = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.galleryDisplayStyles)
+    PhotoDeckAPICache['gallery_display_styles/' .. urlname] = result
+    logger:trace('PhotoDeckAPI.galleryDisplayStyles: ' .. printTable(result))
+  end
   return result
 end
 
