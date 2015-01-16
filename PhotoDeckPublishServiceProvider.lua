@@ -337,18 +337,19 @@ function publishServiceProvider.processRenderedPhotos( functionContext, exportCo
   -- Look for a gallery id for this collection.
   local galleryId = collectionInfo.remoteId
   local galleryPhotos
-  local gallery
   local urlname = exportSettings.websiteChosen
-  local galleries = PhotoDeckAPI.galleries(urlname)
+  local gallery = nil
 
-  if not galleryId then
+  if galleryId then
+    gallery = PhotoDeckAPI.gallery(urlname, galleryId)
+  end
+
+  if not gallery then
     -- Create or update this gallery.
     if not collectionInfo.publishedCollection then
       collectionInfo.publishedCollection = exportContext.publishedCollection
     end
     gallery = PhotoDeckAPI.createOrUpdateGallery(exportSettings, collectionInfo.name, collectionInfo)
-  else
-    gallery = galleries[galleryId]
   end
 
   -- gather information for dealing with recordPublishedPhotoUrl bug
