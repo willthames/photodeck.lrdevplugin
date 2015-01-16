@@ -258,15 +258,14 @@ function PhotoDeckAPI.createOrUpdateGallery(publishSettings, name, collectionInf
   local collection = collectionInfo.publishedCollection
   -- prefer remote Id, particularly for renames, but optionally defer to name
   local gallery = galleries[collection:getRemoteId()] or galleries[name]
-  -- no idea how to deal with multiple parents as yet
-  assert(not collectionInfo.parents or #collectionInfo.parents < 2)
   for _, parent in pairs(collectionInfo.parents) do
     logger:trace(printTable(parent))
-    parentgallery = galleries[parent.remoteCollectionId] or galleries[parent.name]
-    if not parentgallery then
-      parentgallery = PhotoDeckAPI.createGallery(urlname, parent.name, parent,
-          rootgallery.uuid)
+    local galleryforparent = galleries[parent.remoteCollectionId] or galleries[parent.name]
+    if not galleryforparent then
+      galleryforparent = PhotoDeckAPI.createGallery(urlname, parent.name, parent,
+          parentgallery.uuid)
     end
+    parentgallery = galleryforparent
     local parentCollection = collection.catalog:getPublishedCollectionByLocalIdentifier(parent.localCollectionId)
     parentgallery.fullurl = website.homeurl .. "/-/" .. parentgallery.fullurlpath
     if parentCollection and (not parent.remoteCollectionId or parentCollection:getRemoteId() ~= parent.remoteCollectionId or parentCollection:getRemoteUrl() ~= parentgallery.fullurl) then

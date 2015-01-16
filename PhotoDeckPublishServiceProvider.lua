@@ -343,6 +343,9 @@ function publishServiceProvider.processRenderedPhotos( functionContext, exportCo
 
   if not galleryId then
     -- Create or update this gallery.
+    if not collectionInfo.publishedCollection then
+      collectionInfo.publishedCollection = exportContext.publishedCollection
+    end
     gallery = PhotoDeckAPI.createOrUpdateGallery(exportSettings, collectionInfo.name, collectionInfo)
   else
     gallery = galleries[galleryId]
