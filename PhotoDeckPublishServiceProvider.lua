@@ -349,7 +349,7 @@ function publishServiceProvider.processRenderedPhotos( functionContext, exportCo
     if not collectionInfo.publishedCollection then
       collectionInfo.publishedCollection = exportContext.publishedCollection
     end
-    gallery = PhotoDeckAPI.createOrUpdateGallery(exportSettings, collectionInfo.name, collectionInfo)
+    gallery = PhotoDeckAPI.createOrUpdateGallery(urlname, collectionInfo.name, collectionInfo)
   end
 
   -- gather information for dealing with recordPublishedPhotoUrl bug
@@ -370,7 +370,7 @@ function publishServiceProvider.processRenderedPhotos( functionContext, exportCo
     local photo = rendition.photo
 
     -- See if we previously uploaded this photo.
-    local photodeckPhotoId = rendition.publishedPhotoId or uploadedPhotoIds[photo.localIdentifier]
+    local photoId = rendition.publishedPhotoId or uploadedPhotoIds[photo.localIdentifier]
 
     if not rendition.wasSkipped then
       local success, pathOrMessage = rendition:waitForRender()
@@ -382,16 +382,15 @@ function publishServiceProvider.processRenderedPhotos( functionContext, exportCo
         -- Upload or replace the photo.
         local upload
 
-        if photodeckPhotoId and PhotoDeckAPI.getPhoto(photodeckPhotoId) then
-          upload = PhotoDeckAPI.updatePhoto( exportSettings, {
+        if photoId and PhotoDeckAPI.getPhoto(photoId) then
+          upload = PhotoDeckAPI.updatePhoto( photoId, urlname, {
             filePath = pathOrMessage,
-            gallery = gallery,
-            uuid = photodeckPhotoId,
+            gallery = gallery
           })
         else
-          upload = PhotoDeckAPI.uploadPhoto( exportSettings, {
+          upload = PhotoDeckAPI.uploadPhoto( urlname, {
             filePath = pathOrMessage,
-            gallery = gallery,
+            gallery = gallery
           })
         end
 
@@ -423,6 +422,7 @@ publishServiceProvider.deletePhotosFromPublishedCollection = function( publishSe
   logger:trace('deletePhotosFromPublishedCollection')
   local catalog = LrApplication.activeCatalog()
   local collection = catalog:getPublishedCollectionByLocalIdentifier(localCollectionId)
+  local galleryId = collection:getRemoteId()
   -- this next bit is stupid. Why is there no catalog:getPhotoByRemoteId or similar
   local publishedPhotos = collection:getPublishedPhotos()
   local publishedPhotoById = {}
@@ -431,7 +431,22 @@ publishServiceProvider.deletePhotosFromPublishedCollection = function( publishSe
   end
   for i, photoId in ipairs( arrayOfPhotoIds ) do
     local publishedPhoto = publishedPhotoById[photoId]
-    PhotoDeckAPI.removePhotoFromCollection(publishSettings, publishedPhoto, collection)
+
+    local collCount = 0
+    for _, c in pairs(publishedPhoto:getPhoto():getContainedPublishedCollections()) do
+      if c:getRemoteId() ~= galleryId then
+        collCount = collCount + 1
+      end
+    end
+
+    if collCount == 0 then
+      -- delete photo if this is the only collection it's in
+      PhotoDeckAPI.deletePhoto(photoId)
+    else
+      -- otherwise unpublish from the passed in collection
+      PhotoDeckAPI.unpublishPhoto(photoId, galleryId)
+    end
+
     deletedCallback( photoId )
   end
 end
@@ -491,23 +506,29 @@ publishServiceProvider.viewForCollectionSettings = function( f, publishSettings,
 end
 
 publishServiceProvider.updateCollectionSettings = function( publishSettings, info )
-  PhotoDeckAPI.createOrUpdateGallery(publishSettings, info.collectionSettings.LR_liveName, info)
+  local urlname = publishSettings.websiteChosen
+  PhotoDeckAPI.createOrUpdateGallery(urlname, info.collectionSettings.LR_liveName, info)
 end
 
 publishServiceProvider.updateCollectionSetSettings = function( publishSettings, info )
-  PhotoDeckAPI.createOrUpdateGallery(publishSettings, info.name, info)
+  local urlname = publishSettings.websiteChosen
+  PhotoDeckAPI.createOrUpdateGallery(urlname, info.name, info)
 end
 
 publishServiceProvider.renamePublishedCollection = function( publishSettings, info )
-  PhotoDeckAPI.createOrUpdateGallery(publishSettings, info.name, info)
+  local urlname = publishSettings.websiteChosen
+  PhotoDeckAPI.createOrUpdateGallery(urlname, info.name, info)
 end
 
 publishServiceProvider.reparentPublishedCollection = function( publishSettings, info )
-  PhotoDeckAPI.createOrUpdateGallery(publishSettings, info.name, info)
+  local urlname = publishSettings.websiteChosen
+  PhotoDeckAPI.createOrUpdateGallery(urlname, info.name, info)
 end
 
 publishServiceProvider.deletePublishedCollection = function( publishSettings, info )
-  PhotoDeckAPI.deleteGallery(publishSettings, info)
+  local urlname = publishSettings.websiteChosen
+  local galleryId = info.remoteId
+  PhotoDeckAPI.deleteGallery(urlname, galleryId)
 end
 
 return publishServiceProvider
