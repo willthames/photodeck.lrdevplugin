@@ -15,6 +15,7 @@ local isTable = PhotoDeckUtils.isTable
 local printTable = PhotoDeckUtils.printTable
 
 local PhotoDeckAPI = {}
+local PhotoDeckAPICache = {}
 
 -- sign API request according to docs at
 -- http://www.photodeck.com/developers/get-started/
@@ -98,12 +99,17 @@ local function handle_errors(response, resp_headers, onerror)
   local status = PhotoDeckUtils.filter(resp_headers, function(v) return isTable(v) and v.field == 'Status' end)[1]
 
   if not status or status.value > "400" then
-    local statuscode = string.sub(status.value, 1, 3)
+    local statuscode
+    if status then
+      statuscode = string.sub(status.value, 1, 3)
+    end
     if onerror and onerror[statuscode] then
       return onerror[statuscode]()
     end
-    logger:error("Bad response: " .. response)
-    logger:error(PhotoDeckUtils.printLrTable(resp_headers))
+    logger:error("Bad response: " .. (response or "(no response)"))
+    if resp_headers then
+      logger:error(PhotoDeckUtils.printLrTable(resp_headers))
+    end
     -- raise this up to the user at this point?
   end
   return response
@@ -174,9 +180,13 @@ end
 
 function PhotoDeckAPI.websites()
   logger:trace('PhotoDeckAPI.websites')
-  local response, headers = PhotoDeckAPI.request('GET', '/websites.xml', { view = 'details' })
-  local result = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.websites)
-  -- logger:trace(printTable(result))
+  local result = PhotoDeckAPICache['websites']
+  if not result then
+    local response, headers = PhotoDeckAPI.request('GET', '/websites.xml', { view = 'details' })
+    result = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.websites)
+    PhotoDeckAPICache['websites'] = result
+    -- logger:trace(printTable(result))
+  end
   return result
 end
 
@@ -188,73 +198,87 @@ function PhotoDeckAPI.galleries(urlname)
   return result
 end
 
-local function buildGalleryInfo(gallery)
+function PhotoDeckAPI.gallery(urlname, galleryId)
+  logger:trace('PhotoDeckAPI.gallery')
+  local response, headers = PhotoDeckAPI.request('GET', '/websites/' .. urlname .. '/galleries/' .. galleryId .. '.xml', { view = 'details' })
+  local result = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.gallery)
+  -- logger:trace(printTable(result))
+  return result
+end
+
+local function buildGalleryInfoFromLrCollection(collection)
   local galleryInfo = {}
-  if gallery.getCollectionInfoSummary then
-    local info = gallery:getCollectionInfoSummary().collectionSettings
+  if collection.getCollectionInfoSummary then
+    local info = collection:getCollectionInfoSummary().collectionSettings
     galleryInfo['gallery[description]'] = info['description']
     galleryInfo['gallery[display_style]'] = info['display_style']
   end
   return galleryInfo
 end
 
-function PhotoDeckAPI.createGallery(urlname, name, gallery, parentId)
+function PhotoDeckAPI.createGallery(urlname, name, collection, parentId)
   logger:trace('PhotoDeckAPI.createGallery')
-  local galleryInfo = buildGalleryInfo(gallery)
+  local galleryInfo = buildGalleryInfoFromLrCollection(collection)
   galleryInfo['gallery[parent]'] = parentId
   galleryInfo['gallery[name]'] = name
   logger:trace(printTable(galleryInfo))
-  PhotoDeckAPI.request('POST', '/websites/' .. urlname .. '/galleries.xml', galleryInfo)
-  local galleries = PhotoDeckAPI.galleries(urlname)
-  return galleries[name]
+  local response, headers = PhotoDeckAPI.request('POST', '/websites/' .. urlname .. '/galleries.xml', galleryInfo)
+  local result = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.createGallery)
+  local gallery = PhotoDeckAPI.gallery(urlname, result['uuid'])
+  return gallery
 end
 
-function PhotoDeckAPI.updateGallery(urlname, uuid, newname, gallery, parentId)
+function PhotoDeckAPI.updateGallery(urlname, galleryId, newname, collection, parentId)
   logger:trace('PhotoDeckAPI.updateGallery')
-  local galleryInfo = buildGalleryInfo(gallery)
+  local galleryInfo = buildGalleryInfoFromLrCollection(collection)
   galleryInfo['gallery[name]'] = newname
   galleryInfo['gallery[parent]'] = parentId
   galleryInfo['gallery[url_path]'] = string.gsub(newname:lower(), ' ', '-')
   logger:trace(printTable(galleryInfo))
-  local response = PhotoDeckAPI.request('PUT', '/websites/' .. urlname .. '/galleries/' .. uuid .. '.xml', galleryInfo)
+  local response = PhotoDeckAPI.request('PUT', '/websites/' .. urlname .. '/galleries/' .. galleryId .. '.xml', galleryInfo)
   logger:trace('PhotoDeckAPI.updateGallery: ' .. response)
-  local galleries = PhotoDeckAPI.galleries(urlname)
-  return galleries[newname]
+  local gallery = PhotoDeckAPI.gallery(urlname, galleryId)
+  return gallery
 end
 
 
-function PhotoDeckAPI.createOrUpdateGallery(publishSettings, name, collectionInfo)
+function PhotoDeckAPI.createOrUpdateGallery(urlname, name, collectionInfo)
   logger:trace('PhotoDeckAPI.createOrUpdateGallery')
-  local urlname = publishSettings.websiteChosen
   local website = PhotoDeckAPI.websites()[urlname]
   local galleries = PhotoDeckAPI.galleries(urlname)
-  local parentgallery = galleries["Galleries"]
+  local rootGallery = nil
+  for _, gallery in pairs(galleries) do
+    if not gallery['parentuuid'] or gallery['parentuuid'] == "" then
+      rootGallery = gallery
+      break
+    end
+  end
+  local parentGallery = rootGallery
   local collection = collectionInfo.publishedCollection
   -- prefer remote Id, particularly for renames, but optionally defer to name
   local gallery = galleries[collection:getRemoteId()] or galleries[name]
-  -- no idea how to deal with multiple parents as yet
-  assert(not collectionInfo.parents or #collectionInfo.parents < 2)
   for _, parent in pairs(collectionInfo.parents) do
     logger:trace(printTable(parent))
-    parentgallery = galleries[parent.remoteCollectionId] or galleries[parent.name]
-    if not parentgallery then
-      parentgallery = PhotoDeckAPI.createGallery(urlname, parent.name, parent,
-          galleries["Galleries"].uuid)
+    local galleryForParent = galleries[parent.remoteCollectionId] or galleries[parent.name]
+    if not galleryForParent then
+      galleryForParent = PhotoDeckAPI.createGallery(urlname, parent.name, parent,
+          parentGallery.uuid)
     end
+    parentGallery = galleryForParent
     local parentCollection = collection.catalog:getPublishedCollectionByLocalIdentifier(parent.localCollectionId)
-    parentgallery.fullurl = website.homeurl .. "/-/" .. parentgallery.fullurlpath
-    if parentCollection and (not parent.remoteCollectionId or parentCollection:getRemoteId() ~= parent.remoteCollectionId or parentCollection:getRemoteUrl() ~= parentgallery.fullurl) then
+    parentGallery.fullurl = website.homeurl .. "/-/" .. parentGallery.fullurlpath
+    if parentCollection and (not parent.remoteCollectionId or parentCollection:getRemoteId() ~= parent.remoteCollectionId or parentCollection:getRemoteUrl() ~= parentGallery.fullurl) then
       logger:trace('Updating parent remote Id and Url')
       parentCollection.catalog:withWriteAccessDo('Set Parent Remote Id and Url', function()
-        parentCollection:setRemoteId(parentgallery.uuid)
-        parentCollection:setRemoteUrl(parentgallery.fullurl)
+        parentCollection:setRemoteId(parentGallery.uuid)
+        parentCollection:setRemoteUrl(parentGallery.fullurl)
       end)
     end
   end
   if gallery then
-    gallery = PhotoDeckAPI.updateGallery(urlname, gallery.uuid, name, collection, parentgallery.uuid)
+    gallery = PhotoDeckAPI.updateGallery(urlname, gallery.uuid, name, collection, parentGallery.uuid)
   else
-    gallery = PhotoDeckAPI.createGallery(urlname, name, collection, parentgallery.uuid)
+    gallery = PhotoDeckAPI.createGallery(urlname, name, collection, parentGallery.uuid)
   end
   gallery.fullurl = website.homeurl .. "/-/" .. gallery.fullurlpath
   if collection:getRemoteId() == nil or collection:getRemoteId() ~= gallery.uuid or
@@ -269,9 +293,9 @@ function PhotoDeckAPI.createOrUpdateGallery(publishSettings, name, collectionInf
 end
 
 -- getPhoto returns a photo with remote ID uuid, or nil if it does not exist
-function PhotoDeckAPI.getPhoto(uuid)
+function PhotoDeckAPI.getPhoto(photoId)
   logger:trace('PhotoDeckAPI.getPhoto')
-  local url = '/medias/' .. uuid .. '.xml'
+  local url = '/medias/' .. photoId .. '.xml'
   local onerror = {}
   onerror["404"] = function() return nil end
   local response = PhotoDeckAPI.request('GET', url, nil, onerror)
@@ -284,9 +308,9 @@ function PhotoDeckAPI.getPhoto(uuid)
   end
 end
 
-function PhotoDeckAPI.photosInGallery(exportSettings, gallery)
+function PhotoDeckAPI.photosInGallery(urlname, galleryId)
   logger:trace('PhotoDeckAPI.photosInGallery')
-  local url = '/websites/' .. exportSettings.websiteChosen .. '/galleries/' .. gallery.uuid .. '.xml'
+  local url = '/websites/' .. urlname .. '/galleries/' .. galleryId .. '.xml'
   local response, headers = PhotoDeckAPI.request('GET', url, { view = 'details_with_medias' })
   local medias = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.photosInGallery)
   -- turn it into a set for ease of testing inclusion
@@ -300,13 +324,12 @@ function PhotoDeckAPI.photosInGallery(exportSettings, gallery)
   return mediaSet
 end
 
-function PhotoDeckAPI.uploadPhoto( exportSettings, t)
+function PhotoDeckAPI.uploadPhoto( urlname, t)
   logger:trace('PhotoDeckAPI.uploadPhoto')
   -- set up authorisation headers request
-  local website = PhotoDeckAPI.websites()[exportSettings.websiteChosen]
+  local website = PhotoDeckAPI.websites()[urlname]
   local headers = auth_headers('POST', '/medias.xml')
   local content = {
-    { name = 'media[replace]', value = "1" },
     { name = 'media[content]', filePath = t.filePath,
       fileName = PhotoDeckUtils.basename(t.filePath), contentType = 'image/jpeg' },
     { name = 'media[publish_to_galleries]', value = t.gallery.uuid }
@@ -332,11 +355,11 @@ local function multipartRequest(url, content, method)
   return response
 end
 
-function PhotoDeckAPI.updatePhoto( exportSettings, t)
+function PhotoDeckAPI.updatePhoto( photoId, urlname, t)
   logger:trace('PhotoDeckAPI.updatePhoto: ' .. printTable(t))
   -- set up authorisation headers request
-  local website = PhotoDeckAPI.websites()[exportSettings.websiteChosen]
-  local url = '/medias/' .. t.uuid .. '.xml'
+  local website = PhotoDeckAPI.websites()[urlname]
+  local url = '/medias/' .. photoId .. '.xml'
   local content = {
     { name = 'media[content]', filePath = t.filePath,
       fileName = PhotoDeckUtils.basename(t.filePath), contentType = 'image/jpeg' },
@@ -350,45 +373,36 @@ function PhotoDeckAPI.updatePhoto( exportSettings, t)
   return media
 end
 
-function PhotoDeckAPI.deletePhoto(publishSettings, photoId)
+function PhotoDeckAPI.deletePhoto(photoId)
   logger:trace('PhotoDeckAPI.deletePhoto')
   local response, resp_headers = PhotoDeckAPI.request('DELETE', '/medias/' .. photoId .. '.xml')
   logger:trace('PhotoDeckAPI.deletePhoto: ' .. response)
 end
 
-function PhotoDeckAPI.removePhotoFromCollection(publishSettings, publishedPhoto, collection)
-  logger:trace('PhotoDeckAPI.removePhotoFromCollection')
-  -- delete photo if this is the only collection it's in
-  local photoId = publishedPhoto:getRemoteId()
-  local collCount = 0
-  for _, c in pairs(publishedPhoto:getPhoto():getContainedPublishedCollections()) do
-    if c:getRemoteId() ~= collection:getRemoteId() then
-      collCount = collCount + 1
-    end
-  end
-  if collCount == 0 then
-    PhotoDeckAPI.deletePhoto(publishSettings, photoId)
-    return
-  end
-  -- otherwise unpublish from the passed in collection
+function PhotoDeckAPI.unpublishPhoto(photoId, galleryId)
+  logger:trace('PhotoDeckAPI.unpublishPhoto')
   local url = '/medias/' .. photoId .. '.xml'
-  local content = { { name = 'media[unpublish_from_galleries]', value = collection:getRemoteId() } }
+  local content = { { name = 'media[unpublish_from_galleries]', value = galleryId } }
   local response = multipartRequest(url, content, 'PUT')
-  logger:trace('PhotoDeckAPI.removePhotoFromCollection: ' .. response)
+  logger:trace('PhotoDeckAPI.unpublishPhoto: ' .. response)
 end
 
 function PhotoDeckAPI.galleryDisplayStyles(urlname)
   logger:trace('PhotoDeckAPI.galleryDisplayStyles')
-  local url = '/websites/' .. urlname .. '/gallery_display_styles.xml'
-  local response, headers = PhotoDeckAPI.request('GET', url, { view = 'details' })
-  local result = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.galleryDisplayStyles)
-  logger:trace('PhotoDeckAPI.galleryDisplayStyles: ' .. printTable(result))
+  local result = PhotoDeckAPICache['gallery_display_styles/' .. urlname]
+  if not result then
+    local url = '/websites/' .. urlname .. '/gallery_display_styles.xml'
+    local response, headers = PhotoDeckAPI.request('GET', url, { view = 'details' })
+    result = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.galleryDisplayStyles)
+    PhotoDeckAPICache['gallery_display_styles/' .. urlname] = result
+    logger:trace('PhotoDeckAPI.galleryDisplayStyles: ' .. printTable(result))
+  end
   return result
 end
 
-function PhotoDeckAPI.deleteGallery(publishSettings, info)
+function PhotoDeckAPI.deleteGallery(urlname, galleryId)
   logger:trace('PhotoDeckAPI.deleteGallery')
-  local url = '/websites/' .. publishSettings.websiteChosen .. '/galleries/' .. info.remoteId .. '.xml'
+  local url = '/websites/' .. urlname .. '/galleries/' .. galleryId .. '.xml'
   logger:trace(url)
   local response, resp_headers = PhotoDeckAPI.request('DELETE', url)
   logger:trace('PhotoDeckAPI.deleteGallery: ' .. response)

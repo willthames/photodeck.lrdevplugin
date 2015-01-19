@@ -1,5 +1,12 @@
+0.9 - 15/01/2014
+----------------
+Don't replace photos with identical file names at upload
+Fix root gallery discovery when root gallery is not named "Galleries"
+Reduce number of calls to PhotoDeck API
+Minor fixes
+
 0.8 - 29/12/2014
---------------------
+----------------
 Fix republishing deleted photos
 Add getPhoto API to give some details of photos, including contents
 Correct published URLs for photos
