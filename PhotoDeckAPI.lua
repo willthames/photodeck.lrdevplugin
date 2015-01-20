@@ -58,31 +58,6 @@ local function urlencode (s)
   return s
 end
 
-local function table_to_mime_multipart(data, boundary)
-  assert(PhotoDeckUtils.isTable(data))
-  local result = ''
-  for _, v in pairs(data) do
-    result = result .. '--' .. boundary .. "\n"
-    result = result .. 'Content-Disposition: form-data; name="' .. v.name .. '"'
-    if v.fileName then
-      result = result .. ';filename="' .. v.fileName ..'"'
-    end
-    result = result .. "\n"
-    if v.contentType then
-      result = result .. "Content-Type: " .. v.contentType .. "\n"
-    end
-    result = result .. "\n"
-    if v.filePath then
-      result = result .. LrFileUtils.readFile(v.filePath) .. "\n"
-    else
-      result = result .. v.value .. "\n"
-    end
-  end
-  result = result .. '--' .. boundary .. '--' .. "\n"
-  -- logger:trace(string.gsub(result, "[^%w %p]+", '.'))
-  return result
-end
-
 -- convert lua table to url encoded data
 -- from http://www.lua.org/pil/20.3.html
 local function table_to_querystring(data)
@@ -145,6 +120,28 @@ function PhotoDeckAPI.request(method, uri, data, onerror)
     table.insert(headers, { field = 'Content-Type',  value = 'application/x-www-form-urlencoded'})
     result, resp_headers = LrHttp.post(fullurl, body, headers, method)
   end
+
+  result = handle_errors(result, resp_headers, onerror)
+
+  return result, resp_headers
+end
+
+function PhotoDeckAPI.requestMultiPart(method, uri, content, onerror)
+  if method ~= "POST" then
+    -- LrHttp doesn't implement non-POSTs multipart requests:
+    -- POST content but pass the correct method to the PhotoDeck API as a field
+    table.insert(content, { name = "_method", value = method })
+    method = "POST"
+  end
+
+  -- set up authorisation headers
+  local headers = auth_headers(method, uri)
+  -- build full url
+  local fullurl = urlprefix .. uri
+
+  -- call API
+  local result, resp_headers
+  result, resp_headers = LrHttp.postMultipart(fullurl, content, headers)
 
   result = handle_errors(result, resp_headers, onerror)
 
@@ -328,36 +325,22 @@ function PhotoDeckAPI.uploadPhoto( urlname, t)
   logger:trace('PhotoDeckAPI.uploadPhoto')
   -- set up authorisation headers request
   local website = PhotoDeckAPI.websites()[urlname]
-  local headers = auth_headers('POST', '/medias.xml')
+  local url = '/medias.xml'
   local content = {
     { name = 'media[content]', filePath = t.filePath,
       fileName = PhotoDeckUtils.basename(t.filePath), contentType = 'image/jpeg' },
     { name = 'media[publish_to_galleries]', value = t.gallery.uuid }
   }
   logger:trace('PhotoDeckAPI.uploadPhoto: ' .. printTable(content))
-  local response, resp_headers = LrHttp.postMultipart(urlprefix .. '/medias.xml', content, headers)
-  handle_errors(response, resp_headers)
+  local response, headers = PhotoDeckAPI.requestMultiPart('POST', url, content)
   local media = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.uploadPhoto)
   media.url = website.homeurl .. '/-/' .. t.gallery.fullurlpath .. "/-/medias/" .. media.uuid
   logger:trace('PhotoDeckAPI.uploadPhoto: ' .. printTable(media))
   return media
 end
 
-local function multipartRequest(url, content, method)
-  local headers = auth_headers(method, url)
-  -- boundary just needs to be sufficiently unique to be unlikely to appear in the file content
-  local boundary = LrDigest.SHA256.digest(tostring(LrDate.currentTime()))
-  table.insert(headers, { field = 'Content-Type', value = 'multipart/form-data; boundary=' .. boundary })
-  local data = table_to_mime_multipart(content, boundary)
-  --logger:trace('PhotoDeckAPI.updatePhoto: ' .. string.gsub(data, "[^%w%s%p]+", '.'))
-  local response, resp_headers = LrHttp.post(urlprefix .. url, data, headers, 'PUT')
-  handle_errors(response, resp_headers)
-  return response
-end
-
-function PhotoDeckAPI.updatePhoto( photoId, urlname, t)
+function PhotoDeckAPI.updatePhoto(photoId, urlname, t)
   logger:trace('PhotoDeckAPI.updatePhoto: ' .. printTable(t))
-  -- set up authorisation headers request
   local website = PhotoDeckAPI.websites()[urlname]
   local url = '/medias/' .. photoId .. '.xml'
   local content = {
@@ -366,7 +349,7 @@ function PhotoDeckAPI.updatePhoto( photoId, urlname, t)
     { name = 'media[publish_to_galleries]', value = t.gallery.uuid }
   }
   logger:trace('PhotoDeckAPI.updatePhoto: ' .. printTable(content))
-  local response = multipartRequest(url, content, 'PUT')
+  local response, headers = PhotoDeckAPI.requestMultiPart('PUT', url, content)
   local media = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.updatePhoto)
   media.url = website.homeurl .. '/-/' .. t.gallery.fullurlpath .. "/-/medias/" .. media.uuid
   logger:trace('PhotoDeckAPI.updatePhoto: ' .. printTable(media))
@@ -383,7 +366,7 @@ function PhotoDeckAPI.unpublishPhoto(photoId, galleryId)
   logger:trace('PhotoDeckAPI.unpublishPhoto')
   local url = '/medias/' .. photoId .. '.xml'
   local content = { { name = 'media[unpublish_from_galleries]', value = galleryId } }
-  local response = multipartRequest(url, content, 'PUT')
+  local response, headers = PhotoDeckAPI.requestMultiPart('PUT', url, content)
   logger:trace('PhotoDeckAPI.unpublishPhoto: ' .. response)
 end
 
