@@ -36,6 +36,7 @@ publishServiceProvider.exportPresetFields = {
   { key = 'apiKey', default = "" },
   { key = 'apiSecret', default = "" },
   { key = 'websiteChosen', default = "" },
+  { key = 'uploadOnRepublish', default = false },
 }
 
 local function  updateApiKeyAndSecret(propertyTable)
@@ -308,11 +309,25 @@ function publishServiceProvider.sectionsForTopOfDialog( f, propertyTable )
       }
     }
   }
+  local publishSettings = {
+    title = LOC "$$$/PhotoDeck/ExportDialog/Account=PhotoDeck publish settings",
+    synopsis = LrView.bind 'websiteName',
+
+    f:row {
+      bind_to_object = propertyTable,
+
+      f:checkbox {
+        title = 'Re-upload photo when re-publishing',
+        value = LrView.bind 'uploadOnRepublish'
+      }
+    }
+  }
 
   return {
     apiCredentials,
     userCredentials,
     websiteChoice,
+    publishSettings
   }
 end
 
@@ -383,7 +398,7 @@ function publishServiceProvider.processRenderedPhotos( functionContext, exportCo
         -- Build list of photo attributes
         local photoAttributes = {}
         local publishedPhoto = publishedPhotoById[photo.localIdentifier]
-        local needsUpload = not photoAlreadyPublished or true -- FIXME: how can we detect if the image actually changed since last publish?
+        local needsUpload = not photoAlreadyPublished or exportSettings.uploadOnRepublish
 
         if needsUpload then
           photoAttributes.contentPath = pathOrMessage
