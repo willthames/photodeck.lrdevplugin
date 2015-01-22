@@ -355,11 +355,10 @@ function publishServiceProvider.processRenderedPhotos( functionContext, exportCo
   -- gather information for dealing with recordPublishedPhotoUrl bug
   local catalog = exportSession.catalog
   local collection = exportContext.publishedCollection
-  -- this next bit is stupid. Why is there no catalog:getPhotoByRemoteId or similar
   local publishedPhotos = collection:getPublishedPhotos()
   local publishedPhotoById = {}
   for _, pp in pairs(publishedPhotos) do
-    publishedPhotoById[pp:getRemoteId()] = pp
+    publishedPhotoById[pp:getPhoto().localIdentifier] = pp
   end
 
   -- Iterate through photo renditions.
@@ -379,19 +378,34 @@ function publishServiceProvider.processRenderedPhotos( functionContext, exportCo
       -- Check for cancellation again after photo has been rendered.
       if progressScope:isCanceled() then break end
       if success then
-        -- Upload or replace the photo.
+        local photoAlreadyPublished = photoId and not not PhotoDeckAPI.getPhoto(photoId)
+
+        -- Build list of photo attributes
+        local photoAttributes = {}
+        local publishedPhoto = publishedPhotoById[photo.localIdentifier]
+        local needsUpload = not photoAlreadyPublished or true -- FIXME: how can we detect if the image actually changed since last publish?
+
+        if needsUpload then
+          photoAttributes.contentPath = pathOrMessage
+        end
+        photoAttributes.publishToGallery = gallery
+        photoAttributes.lrPhoto = photo
+
+        -- Upload or replace/update the photo.
         local upload
 
-        if photoId and PhotoDeckAPI.getPhoto(photoId) then
-          upload = PhotoDeckAPI.updatePhoto( photoId, urlname, {
-            filePath = pathOrMessage,
-            gallery = gallery
-          })
+        if photoAlreadyPublished then
+          upload = PhotoDeckAPI.updatePhoto(photoId, urlname, photoAttributes)
         else
-          upload = PhotoDeckAPI.uploadPhoto( urlname, {
-            filePath = pathOrMessage,
-            gallery = gallery
-          })
+          upload = PhotoDeckAPI.uploadPhoto(urlname, photoAttributes)
+        end
+        logger:trace(printTable(upload))
+
+        if upload.uuid then
+          rendition:recordPublishedPhotoId(upload.uuid)
+        end
+        if upload.url then
+          rendition:recordPublishedPhotoUrl(upload.url)
         end
 
         -- When done with photo, delete temp file. There is a cleanup step that happens later,
@@ -400,15 +414,6 @@ function publishServiceProvider.processRenderedPhotos( functionContext, exportCo
 
         -- Remember this in the list of photos we uploaded.
         uploadedPhotoIds[photo.localIdentifier] = upload.uuid
-
-        -- Record this PhotoDeck ID with the photo
-        if publishedPhotoById[upload.uuid] then
-          logger:trace(printTable(upload))
-          publishedPhoto = publishedPhotoById[upload.uuid]:getPhoto()
-          logger:trace(printTable(publishedPhoto:getFormattedMetadata()))
-        end
-        rendition:recordPublishedPhotoId( upload.uuid )
-        rendition:recordPublishedPhotoUrl( upload.url )
       end
     end
   end

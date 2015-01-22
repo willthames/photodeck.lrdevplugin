@@ -213,6 +213,20 @@ local function buildGalleryInfoFromLrCollection(collection)
   return galleryInfo
 end
 
+local function buildPhotoInfoFromLrPhoto(photo)
+  local photoInfo = {}
+  photoInfo['media[title]'] = photo:getFormattedMetadata("title")
+  photoInfo['media[description]'] = photo:getFormattedMetadata("caption")
+  photoInfo['media[keywords]'] = photo:getFormattedMetadata("keywordTagsForExport")
+  photoInfo['media[location]'] = photo:getFormattedMetadata("location")
+  photoInfo['media[city]'] = photo:getFormattedMetadata("city")
+  photoInfo['media[state]'] = photo:getFormattedMetadata("stateProvince")
+  photoInfo['media[country]'] = photo:getFormattedMetadata("country")
+  photoInfo['media[author]'] = photo:getFormattedMetadata("creator")
+  photoInfo['media[copyright]'] = photo:getFormattedMetadata("copyright")
+  return photoInfo
+end
+
 function PhotoDeckAPI.createGallery(urlname, name, collection, parentId)
   logger:trace('PhotoDeckAPI.createGallery')
   local galleryInfo = buildGalleryInfoFromLrCollection(collection)
@@ -321,37 +335,56 @@ function PhotoDeckAPI.photosInGallery(urlname, galleryId)
   return mediaSet
 end
 
-function PhotoDeckAPI.uploadPhoto( urlname, t)
+function PhotoDeckAPI.uploadPhoto(urlname, attributes)
   logger:trace('PhotoDeckAPI.uploadPhoto')
-  -- set up authorisation headers request
-  local website = PhotoDeckAPI.websites()[urlname]
   local url = '/medias.xml'
-  local content = {
-    { name = 'media[content]', filePath = t.filePath,
-      fileName = PhotoDeckUtils.basename(t.filePath), contentType = 'image/jpeg' },
-    { name = 'media[publish_to_galleries]', value = t.gallery.uuid }
-  }
+  local content = {}
+  if attributes.contentPath then
+    table.insert(content, { name = 'media[content]', filePath = attributes.contentPath, fileName = PhotoDeckUtils.basename(attributes.contentPath), contentType = 'image/jpeg' })
+  end
+  if attributes.publishToGallery then
+    table.insert(content, { name = 'media[publish_to_galleries]', value = attributes.publishToGallery.uuid })
+  end
+  if attributes.lrPhoto then
+    local attributesFromLrPhoto = buildPhotoInfoFromLrPhoto(attributes.lrPhoto)
+    for k,v in pairs(attributesFromLrPhoto) do
+      table.insert(content, { name = k, value = v })
+    end
+  end
   logger:trace('PhotoDeckAPI.uploadPhoto: ' .. printTable(content))
   local response, headers = PhotoDeckAPI.requestMultiPart('POST', url, content)
   local media = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.uploadPhoto)
-  media.url = website.homeurl .. '/-/' .. t.gallery.fullurlpath .. "/-/medias/" .. media.uuid
+  if attributes.publishToGallery then
+    local website = PhotoDeckAPI.websites()[urlname]
+    media.url = website.homeurl .. '/-/' .. attributes.publishToGallery.fullurlpath .. "/-/medias/" .. media.uuid
+  end
   logger:trace('PhotoDeckAPI.uploadPhoto: ' .. printTable(media))
   return media
 end
 
-function PhotoDeckAPI.updatePhoto(photoId, urlname, t)
+function PhotoDeckAPI.updatePhoto(photoId, urlname, attributes)
   logger:trace('PhotoDeckAPI.updatePhoto: ' .. printTable(t))
-  local website = PhotoDeckAPI.websites()[urlname]
   local url = '/medias/' .. photoId .. '.xml'
-  local content = {
-    { name = 'media[content]', filePath = t.filePath,
-      fileName = PhotoDeckUtils.basename(t.filePath), contentType = 'image/jpeg' },
-    { name = 'media[publish_to_galleries]', value = t.gallery.uuid }
-  }
+  local content = {}
+  if attributes.contentPath then
+    table.insert(content, { name = 'media[content]', filePath = attributes.contentPath, fileName = PhotoDeckUtils.basename(attributes.contentPath), contentType = 'image/jpeg' })
+  end
+  if attributes.publishToGallery then
+    table.insert(content, { name = 'media[publish_to_galleries]', value = attributes.publishToGallery.uuid })
+  end
+  if attributes.lrPhoto then
+    local attributesFromLrPhoto = buildPhotoInfoFromLrPhoto(attributes.lrPhoto)
+    for k,v in pairs(attributesFromLrPhoto) do
+      table.insert(content, { name = k, value = v })
+    end
+  end
   logger:trace('PhotoDeckAPI.updatePhoto: ' .. printTable(content))
   local response, headers = PhotoDeckAPI.requestMultiPart('PUT', url, content)
   local media = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.updatePhoto)
-  media.url = website.homeurl .. '/-/' .. t.gallery.fullurlpath .. "/-/medias/" .. media.uuid
+  if attributes.publishToGallery then
+    local website = PhotoDeckAPI.websites()[urlname]
+    media.url = website.homeurl .. '/-/' .. attributes.publishToGallery.fullurlpath .. "/-/medias/" .. media.uuid
+  end
   logger:trace('PhotoDeckAPI.updatePhoto: ' .. printTable(media))
   return media
 end
