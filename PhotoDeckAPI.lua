@@ -235,8 +235,14 @@ function PhotoDeckAPI.websites()
   if not result then
     response, error_msg = PhotoDeckAPI.request('GET', '/websites.xml', { view = 'details' })
     result = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.websites)
-    if not error_msg and (not result or #result == 0) then
-      error_msg = "No websites found"
+    if not error_msg then
+      websites_count = 0
+      if result then
+        for _ in pairs(result) do websites_count = websites_count + 1 end
+      end
+      if websites_count == 0 then
+        error_msg = "No websites found"
+      end
     end
     if not error_msg then
       PhotoDeckAPICache['websites'] = result
@@ -525,8 +531,14 @@ function PhotoDeckAPI.galleryDisplayStyles(urlname)
     local url = '/websites/' .. urlname .. '/gallery_display_styles.xml'
     response, error_msg = PhotoDeckAPI.request('GET', url, { view = 'details' })
     result = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.galleryDisplayStyles)
-    if not error_msg and (not result or #result == 0) then
-      error_msg = "Couldn't get list of gallery display styles"
+    if not error_msg then
+      styles_count = 0
+      if result then
+        for _ in pairs(result) do styles_count = styles_count + 1 end
+      end
+      if styles_count == 0 then
+        error_msg = "Couldn't get list of gallery display styles"
+      end
     end
     if not error_msg then
       PhotoDeckAPICache['gallery_display_styles/' .. urlname] = result
