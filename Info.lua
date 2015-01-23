@@ -9,5 +9,6 @@ return {
         title = "PhotoDeck", -- this string appears in the Publish Services panel
         file = "PhotoDeckPublishServiceProvider.lua", -- the service definition script
     },
+    LrMetadataProvider = "PhotoDeckMetadataDefinition.lua",
     VERSION = { major=0, minor=9, revision=1 },
 }

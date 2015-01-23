@@ -411,6 +411,12 @@ function publishServiceProvider.processRenderedPhotos( functionContext, exportCo
 
     -- See if we previously uploaded this photo.
     local photoId = rendition.publishedPhotoId or uploadedPhotoIds[photo.localIdentifier]
+    if not photoId then
+      -- previously uploaded in another gallery?
+      catalog:withReadAccessDo( function()
+        photoId = photo:getPropertyForPlugin(_PLUGIN, "photoId")
+      end)
+    end
 
     if not rendition.wasSkipped then
       local success, pathOrMessage = rendition:waitForRender()
@@ -459,6 +465,12 @@ function publishServiceProvider.processRenderedPhotos( functionContext, exportCo
 
 	  -- Remember this in the list of photos we uploaded.
 	  uploadedPhotoIds[photo.localIdentifier] = upload.uuid
+
+
+	  -- Also save the remote photo ID at the LrPhoto level, so that we can find it when publishing in a different gallery
+	  catalog:withWriteAccessDo( "publish", function( context )
+            photo:setPropertyForPlugin(_PLUGIN, "photoId", upload.uuid)
+          end)
 	else
 	  rendition:uploadFailed(error_msg or 'Upload failed')
         end
