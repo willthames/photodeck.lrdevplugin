@@ -499,28 +499,31 @@ publishServiceProvider.deletePhotosFromPublishedCollection = function( publishSe
     publishedPhotoById[pp:getRemoteId()] = pp
   end
   for i, photoId in ipairs( arrayOfPhotoIds ) do
-    local publishedPhoto = publishedPhotoById[photoId]
-
-    local collCount = 0
-    for _, c in pairs(publishedPhoto:getPhoto():getContainedPublishedCollections()) do
-      if c:getRemoteId() ~= galleryId then
-        collCount = collCount + 1
+    error_msg = nil
+    if photoId ~= "" then
+      local publishedPhoto = publishedPhotoById[photoId]
+  
+      local collCount = 0
+      for _, c in pairs(publishedPhoto:getPhoto():getContainedPublishedCollections()) do
+        if c:getRemoteId() ~= galleryId then
+          collCount = collCount + 1
+        end
       end
-    end
-
-    if collCount == 0 then
-      -- delete photo if this is the only collection it's in
-      result, error_msg = PhotoDeckAPI.deletePhoto(photoId)
-
-      if error_msg then
-        LrErrors.throwUserError("Error deleting photo: " .. error_msg)
-      end
-    else
-      -- otherwise unpublish from the passed in collection
-      result, error_msg = PhotoDeckAPI.unpublishPhoto(photoId, galleryId)
-
-      if error_msg then
-        LrErrors.throwUserError("Error unpublishing photo: " .. error_msg)
+  
+      if collCount == 0 then
+        -- delete photo if this is the only collection it's in
+        result, error_msg = PhotoDeckAPI.deletePhoto(photoId)
+  
+        if error_msg then
+          LrErrors.throwUserError("Error deleting photo: " .. error_msg)
+        end
+      else
+        -- otherwise unpublish from the passed in collection
+        result, error_msg = PhotoDeckAPI.unpublishPhoto(photoId, galleryId)
+  
+        if error_msg then
+          LrErrors.throwUserError("Error unpublishing photo: " .. error_msg)
+        end
       end
     end
 
