@@ -353,6 +353,8 @@ function publishServiceProvider.processRenderedPhotos( functionContext, exportCo
   PhotoDeckAPI.connect(exportSettings.apiKey,
        exportSettings.apiSecret, exportSettings.username, exportSettings.password)
 
+  local error_msg
+
   -- Set progress title.
   local progressScope = exportContext:configureProgress {
     title = nPhotos > 1
@@ -417,35 +419,34 @@ function publishServiceProvider.processRenderedPhotos( functionContext, exportCo
       -- Check for cancellation again after photo has been rendered.
       if progressScope:isCanceled() then break end
       if success then
+        error_msg = nil
+
         local photoAlreadyPublished = not not photoId
 	if photoAlreadyPublished then
-	  local remotePhoto, error_msg = PhotoDeckAPI.getPhoto(photoId)
-	  if error_msg then
-            rendition:uploadFailed(error_msg)
-	    next
-	  else
-	    photoAlreadyPublished = not not remotePhoto
-	  end
+	  local remotePhoto
+	  remotePhoto, error_msg = PhotoDeckAPI.getPhoto(photoId)
+	  photoAlreadyPublished = not not remotePhoto
         end
 
-        -- Build list of photo attributes
-        local photoAttributes = {}
-        local publishedPhoto = publishedPhotoById[photo.localIdentifier]
-        local needsUpload = not photoAlreadyPublished or exportSettings.uploadOnRepublish
-
-        if needsUpload then
-          photoAttributes.contentPath = pathOrMessage
-        end
-        photoAttributes.publishToGallery = gallery
-        photoAttributes.lrPhoto = photo
-
-        -- Upload or replace/update the photo.
-        local upload
-
-        if photoAlreadyPublished then
-          upload, error_msg = PhotoDeckAPI.updatePhoto(photoId, urlname, photoAttributes)
-        else
-          upload, error_msg = PhotoDeckAPI.uploadPhoto(urlname, photoAttributes)
+	local upload
+	if not error_msg then
+          -- Build list of photo attributes
+          local photoAttributes = {}
+          local publishedPhoto = publishedPhotoById[photo.localIdentifier]
+          local needsUpload = not photoAlreadyPublished or exportSettings.uploadOnRepublish
+  
+          if needsUpload then
+            photoAttributes.contentPath = pathOrMessage
+          end
+          photoAttributes.publishToGallery = gallery
+          photoAttributes.lrPhoto = photo
+  
+          -- Upload or replace/update the photo.
+          if photoAlreadyPublished then
+            upload, error_msg = PhotoDeckAPI.updatePhoto(photoId, urlname, photoAttributes)
+          else
+            upload, error_msg = PhotoDeckAPI.uploadPhoto(urlname, photoAttributes)
+          end
         end
 
 	if not error_msg and upload and upload.uuid and upload.uuid ~= "" then
