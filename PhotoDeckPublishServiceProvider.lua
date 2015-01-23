@@ -450,7 +450,7 @@ function publishServiceProvider.processRenderedPhotos( functionContext, exportCo
         end
 
 	if not error_msg and upload and upload.uuid and upload.uuid ~= "" then
-          logger:trace(printTable(upload))
+          --logger:trace(printTable(upload))
 
           rendition:recordPublishedPhotoId(upload.uuid)
 	  if upload.url then
@@ -476,7 +476,7 @@ end
 
 publishServiceProvider.deletePhotosFromPublishedCollection = function( publishSettings, arrayOfPhotoIds, deletedCallback, localCollectionId )
   PhotoDeckAPI.connect(publishSettings.apiKey, publishSettings.apiSecret, publishSettings.username, publishSettings.password)
-  logger:trace('deletePhotosFromPublishedCollection')
+  --logger:trace('deletePhotosFromPublishedCollection')
   local catalog = LrApplication.activeCatalog()
   local collection = catalog:getPublishedCollectionByLocalIdentifier(localCollectionId)
   local galleryId = collection:getRemoteId()
