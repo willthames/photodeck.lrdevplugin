@@ -9,11 +9,23 @@ local xsltheader = [[
 ]]
 
 local xsltfooter = [[
-  <xsl:template match="request|query-string"/>
+  <xsl:template match="request|query-string|error"/>
 </xsl:stylesheet>
 ]]
 
 local PhotoDeckAPIXSLT = {}
+
+PhotoDeckAPIXSLT.error = xsltheader .. [[
+  <xsl:template match='/reply'>
+return "<xsl:value-of select='error'/>"
+  </xsl:template>
+]] .. xsltfooter
+
+PhotoDeckAPIXSLT.ping = xsltheader .. [[
+  <xsl:template match='/reply'>
+return "<xsl:value-of select='message'/>"
+  </xsl:template>
+]] .. xsltfooter
 
 PhotoDeckAPIXSLT.whoami = xsltheader .. [[
   <xsl:template match='/reply/user'>
@@ -159,15 +171,16 @@ return t
 ]] .. xsltfooter
 
 PhotoDeckAPIXSLT.transform = function(xmlstring, xslt)
-  local xml = LrXml.parseXml(xmlstring)
-  local luastring = xml:transform(xslt)
-  if luastring ~= '' then
-    logger:trace(luastring)
-  else
-    logger:trace(xmlstring)
+  if xmlstring and string.sub(xmlstring, 1, 5) == '<?xml' then
+    local xml = LrXml.parseXml(xmlstring)
+    local luastring = xml:transform(xslt)
+    if luastring ~= '' then
+      local f = assert(loadstring(luastring))
+      return f()
+    else
+      logger:trace(xmlstring)
+    end
   end
-  local f = assert(loadstring(luastring))
-  return f()
 end
 
 return PhotoDeckAPIXSLT

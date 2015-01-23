@@ -4,6 +4,7 @@ local LrDialogs = import 'LrDialogs'
 local LrFileUtils = import 'LrFileUtils'
 local LrTasks = import 'LrTasks'
 local LrView = import 'LrView'
+local LrErrors = import 'LrErrors'
 
 local logger = import 'LrLogger'( 'PhotoDeckPublishLightroomPlugin' )
 
@@ -111,7 +112,7 @@ local function chooseGalleryDisplayStyle(propertyTable, collectionInfo)
 end
 
 local function ping(propertyTable)
-  propertyTable.pingResult = 'making api call'
+  propertyTable.pingResult = 'Connecting to PhotoDeck...'
   PhotoDeckAPI.connect(propertyTable.apiKey, propertyTable.apiSecret)
   LrTasks.startAsyncTask(function()
     propertyTable.pingResult = PhotoDeckAPI.ping()
@@ -119,13 +120,21 @@ local function ping(propertyTable)
 end
 
 local function login(propertyTable)
-  propertyTable.loggedinResult = 'logging in...'
+  propertyTable.loggedinResult = 'Logging in...'
   PhotoDeckAPI.connect(propertyTable.apiKey,
        propertyTable.apiSecret, propertyTable.username, propertyTable.password)
   LrTasks.startAsyncTask(function()
-    local result = PhotoDeckAPI.whoami()
-    propertyTable.loggedin = true
-    propertyTable.loggedinResult = 'Logged in as ' .. result.firstname .. ' ' .. result.lastname
+    local result, error_msg = PhotoDeckAPI.whoami()
+    if error_msg then
+      propertyTable.loggedin = false
+      propertyTable.loggedinResult = error_msg
+    elseif not result.email or result.email == '' then
+      propertyTable.loggedin = false
+      propertyTable.loggedinResult = "Couldn't log in using those credentials"
+    else
+      propertyTable.loggedin = true
+      propertyTable.loggedinResult = 'Logged in as ' .. result.firstname .. ' ' .. result.lastname
+    end
   end, 'PhotoDeckAPI Login')
 end
 
@@ -141,12 +150,14 @@ local function getGalleryDisplayStyles(propertyTable, collectionInfo)
   PhotoDeckAPI.connect(propertyTable.apiKey,
        propertyTable.apiSecret, propertyTable.username, propertyTable.password)
   LrTasks.startAsyncTask(function()
-    local galleryDisplayStyles = PhotoDeckAPI.galleryDisplayStyles(propertyTable.websiteChosen)
-    for k, v in pairs(galleryDisplayStyles) do
-      table.insert(collectionInfo.galleryDisplayStyles, { title = v.name, value = v.uuid })
-    end
-    if collectionInfo.display_style and collectionInfo.display_style ~= '' then
-      onGalleryDisplayStyleSelect(collectionInfo, nil, collectionInfo.display_style)
+    local galleryDisplayStyles, error_msg = PhotoDeckAPI.galleryDisplayStyles(propertyTable.websiteChosen)
+    if galleryDisplayStyles and not error_msg then
+      for k, v in pairs(galleryDisplayStyles) do
+        table.insert(collectionInfo.galleryDisplayStyles, { title = v.name, value = v.uuid })
+      end
+      if collectionInfo.display_style and collectionInfo.display_style ~= '' then
+        onGalleryDisplayStyleSelect(collectionInfo, nil, collectionInfo.display_style)
+      end
     end
   end, 'PhotoDeckAPI Get Gallery Display Styles')
 end
@@ -159,12 +170,15 @@ local function getWebsites(propertyTable)
   PhotoDeckAPI.connect(propertyTable.apiKey,
        propertyTable.apiSecret, propertyTable.username, propertyTable.password)
   LrTasks.startAsyncTask(function()
-    propertyTable.websites = PhotoDeckAPI.websites()
-    for k, v in pairs(propertyTable.websites) do
-      table.insert(propertyTable.websiteChoices, { title = v.title, value = k })
-    end
-    if propertyTable.websiteChosen and propertyTable.websiteChosen ~= '' then
-      onWebsiteSelect(propertyTable, nil, propertyTable.websiteChosen)
+    websites, error_msg = PhotoDeckAPI.websites()
+    if not error_msg then
+      propertyTable.websites = websites
+      for k, v in pairs(propertyTable.websites) do
+        table.insert(propertyTable.websiteChoices, { title = v.title, value = k })
+      end
+      if propertyTable.websiteChosen and propertyTable.websiteChosen ~= '' then
+        onWebsiteSelect(propertyTable, nil, propertyTable.websiteChosen)
+      end
     end
   end, 'PhotoDeckAPI Get Websites')
 end
@@ -356,7 +370,12 @@ function publishServiceProvider.processRenderedPhotos( functionContext, exportCo
   local gallery = nil
 
   if galleryId then
-    gallery = PhotoDeckAPI.gallery(urlname, galleryId)
+    gallery, error_msg = PhotoDeckAPI.gallery(urlname, galleryId)
+    if error_msg then
+      progressScope:done()
+      LrErrors.throwUserError("Error retrieving gallery: " .. error_msg)
+      return
+    end
   end
 
   if not gallery then
@@ -364,7 +383,12 @@ function publishServiceProvider.processRenderedPhotos( functionContext, exportCo
     if not collectionInfo.publishedCollection then
       collectionInfo.publishedCollection = exportContext.publishedCollection
     end
-    gallery = PhotoDeckAPI.createOrUpdateGallery(urlname, collectionInfo.name, collectionInfo)
+    gallery, error_msg = PhotoDeckAPI.createOrUpdateGallery(urlname, collectionInfo.name, collectionInfo)
+    if error_msg then
+      progressScope:done()
+      LrErrors.throwUserError("Error creating gallery: " .. error_msg)
+      return
+    end
   end
 
   -- gather information for dealing with recordPublishedPhotoUrl bug
@@ -393,7 +417,16 @@ function publishServiceProvider.processRenderedPhotos( functionContext, exportCo
       -- Check for cancellation again after photo has been rendered.
       if progressScope:isCanceled() then break end
       if success then
-        local photoAlreadyPublished = photoId and not not PhotoDeckAPI.getPhoto(photoId)
+        local photoAlreadyPublished = not not photoId
+	if photoAlreadyPublished then
+	  local remotePhoto, error_msg = PhotoDeckAPI.getPhoto(photoId)
+	  if error_msg then
+            rendition:uploadFailed(error_msg)
+	    next
+	  else
+	    photoAlreadyPublished = not not remotePhoto
+	  end
+        end
 
         -- Build list of photo attributes
         local photoAttributes = {}
@@ -410,25 +443,28 @@ function publishServiceProvider.processRenderedPhotos( functionContext, exportCo
         local upload
 
         if photoAlreadyPublished then
-          upload = PhotoDeckAPI.updatePhoto(photoId, urlname, photoAttributes)
+          upload, error_msg = PhotoDeckAPI.updatePhoto(photoId, urlname, photoAttributes)
         else
-          upload = PhotoDeckAPI.uploadPhoto(urlname, photoAttributes)
+          upload, error_msg = PhotoDeckAPI.uploadPhoto(urlname, photoAttributes)
         end
-        logger:trace(printTable(upload))
 
-        if upload.uuid then
+	if not error_msg and upload and upload.uuid and upload.uuid ~= "" then
+          logger:trace(printTable(upload))
+
           rendition:recordPublishedPhotoId(upload.uuid)
-        end
-        if upload.url then
-          rendition:recordPublishedPhotoUrl(upload.url)
+	  if upload.url then
+            rendition:recordPublishedPhotoUrl(upload.url)
+          end
+
+	  -- Remember this in the list of photos we uploaded.
+	  uploadedPhotoIds[photo.localIdentifier] = upload.uuid
+	else
+	  rendition:uploadFailed(error_msg or 'Upload failed')
         end
 
         -- When done with photo, delete temp file. There is a cleanup step that happens later,
         -- but this will help manage space in the event of a large upload.
         LrFileUtils.delete( pathOrMessage )
-
-        -- Remember this in the list of photos we uploaded.
-        uploadedPhotoIds[photo.localIdentifier] = upload.uuid
       end
     end
   end
@@ -461,13 +497,23 @@ publishServiceProvider.deletePhotosFromPublishedCollection = function( publishSe
 
     if collCount == 0 then
       -- delete photo if this is the only collection it's in
-      PhotoDeckAPI.deletePhoto(photoId)
+      result, error_msg = PhotoDeckAPI.deletePhoto(photoId)
+
+      if error_msg then
+        LrErrors.throwUserError("Error deleting photo: " .. error_msg)
+      end
     else
       -- otherwise unpublish from the passed in collection
-      PhotoDeckAPI.unpublishPhoto(photoId, galleryId)
+      result, error_msg = PhotoDeckAPI.unpublishPhoto(photoId, galleryId)
+
+      if error_msg then
+        LrErrors.throwUserError("Error unpublishing photo: " .. error_msg)
+      end
     end
 
-    deletedCallback( photoId )
+    if not error_msg then
+      deletedCallback(photoId)
+    end
   end
 end
 
@@ -527,28 +573,43 @@ end
 
 publishServiceProvider.updateCollectionSettings = function( publishSettings, info )
   local urlname = publishSettings.websiteChosen
-  PhotoDeckAPI.createOrUpdateGallery(urlname, info.collectionSettings.LR_liveName, info)
+  local result, error_msg = PhotoDeckAPI.createOrUpdateGallery(urlname, info.collectionSettings.LR_liveName, info)
+  if error_msg then
+    LrErrors.throwUserError("Error updating gallery: " .. error_msg)
+  end
 end
 
 publishServiceProvider.updateCollectionSetSettings = function( publishSettings, info )
   local urlname = publishSettings.websiteChosen
-  PhotoDeckAPI.createOrUpdateGallery(urlname, info.name, info)
+  local result, error_msg = PhotoDeckAPI.createOrUpdateGallery(urlname, info.name, info)
+  if error_msg then
+    LrErrors.throwUserError("Error updating gallery: " .. error_msg)
+  end
 end
 
 publishServiceProvider.renamePublishedCollection = function( publishSettings, info )
   local urlname = publishSettings.websiteChosen
-  PhotoDeckAPI.createOrUpdateGallery(urlname, info.name, info)
+  local result, error_msg = PhotoDeckAPI.createOrUpdateGallery(urlname, info.name, info)
+  if error_msg then
+    LrErrors.throwUserError("Error renaming gallery: " .. error_msg)
+  end
 end
 
 publishServiceProvider.reparentPublishedCollection = function( publishSettings, info )
   local urlname = publishSettings.websiteChosen
-  PhotoDeckAPI.createOrUpdateGallery(urlname, info.name, info)
+  local result, error_msg = PhotoDeckAPI.createOrUpdateGallery(urlname, info.name, info)
+  if error_msg then
+    LrErrors.throwUserError("Error reparenting gallery: " .. error_msg)
+  end
 end
 
 publishServiceProvider.deletePublishedCollection = function( publishSettings, info )
   local urlname = publishSettings.websiteChosen
   local galleryId = info.remoteId
-  PhotoDeckAPI.deleteGallery(urlname, galleryId)
+  local result, error_msg = PhotoDeckAPI.deleteGallery(urlname, galleryId)
+  if error_msg then
+    LrErrors.throwUserError("Error deleting gallery: " .. error_msg)
+  end
 end
 
 return publishServiceProvider
