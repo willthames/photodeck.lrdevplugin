@@ -509,7 +509,9 @@ end
 
 function PhotoDeckAPI.deletePhoto(photoId)
   logger:trace(string.format('PhotoDeckAPI.deletePhoto("%s")', photoId))
-  local response, error_msg = PhotoDeckAPI.request('DELETE', '/medias/' .. photoId .. '.xml')
+  local onerror = {}
+  onerror["404"] = function() return nil end
+  local response, error_msg = PhotoDeckAPI.request('DELETE', '/medias/' .. photoId .. '.xml', nil, onerror)
   --logger:trace('PhotoDeckAPI.deletePhoto: ' .. response)
   return response, error_msg
 end
@@ -518,7 +520,9 @@ function PhotoDeckAPI.unpublishPhoto(photoId, galleryId)
   logger:trace(string.format('PhotoDeckAPI.unpublishPhoto("%s", "%s")', photoId, galleryId))
   local url = '/medias/' .. photoId .. '.xml'
   local content = { { name = 'media[unpublish_from_galleries]', value = galleryId } }
-  local response, error_msg = PhotoDeckAPI.requestMultiPart('PUT', url, content)
+  local onerror = {}
+  onerror["404"] = function() return nil end
+  local response, error_msg = PhotoDeckAPI.requestMultiPart('PUT', url, content, onerror)
   --logger:trace('PhotoDeckAPI.unpublishPhoto: ' .. response)
   return response, error_msg
 end
