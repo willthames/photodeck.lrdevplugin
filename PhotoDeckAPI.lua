@@ -335,34 +335,41 @@ function PhotoDeckAPI.createOrUpdateGallery(urlname, name, collectionInfo)
     return nil, error_msg
   end
 
-  local galleries, error_msg = PhotoDeckAPI.galleries(urlname)
-  if error_msg then
-    return nil, error_msg
-  end
-
-  local rootGallery = nil
-  for _, gallery in pairs(galleries) do
-    if not gallery['parentuuid'] or gallery['parentuuid'] == "" then
-      rootGallery = gallery
-      break
-    end
-  end
-
-  local parentGallery = rootGallery
   local collection = collectionInfo.publishedCollection
-  -- prefer remote Id, particularly for renames, but optionally defer to name
-  local gallery = galleries[collection:getRemoteId()] or galleries[name]
+
+  local galleries = nil
+  local rootGalleryId = website.rootgalleryid
+  if not rootGalleryId or rootGalleryId == "" then
+    return nil, "Couldn't find root gallery"
+  end
+
+  local parentGalleryId = rootGalleryId -- by default, our parent gallery is the root gallery
+
+  -- Find PhotoDeck parent galleries, create if missing and connect them to LightRoom if not already done
   for _, parent in pairs(collectionInfo.parents) do
-    --logger:trace(printTable(parent))
-    local galleryForParent = galleries[parent.remoteCollectionId] or galleries[parent.name]
-    if not galleryForParent then
-      galleryForParent, error_msg = PhotoDeckAPI.createGallery(urlname, parent.name, parent,
-          parentGallery.uuid)
+    local parentGallery = nil
+    local parentId = parent.remoteCollectionId
+    if parentId then
+      -- find by remote ID if known
+      parentGallery = PhotoDeckAPI.gallery(urlname, parentId)
+    end
+    if not parentGallery then
+      -- not found, search by name
+      if not galleries then
+        galleries, error_msg = PhotoDeckAPI.galleries(urlname)
+        if error_msg then
+          return nil, error_msg
+        end
+      end
+      parentGallery = galleries[parent.name]
+    end
+    if not parentGallery then
+      -- not found, create
+      parentGallery, error_msg = PhotoDeckAPI.createGallery(urlname, parent.name, parent, parentGalleryId)
       if error_msg then
         return nil, error_msg
       end
     end
-    parentGallery = galleryForParent
     local parentCollection = collection.catalog:getPublishedCollectionByLocalIdentifier(parent.localCollectionId)
     parentGallery.fullurl = website.homeurl .. "/-/" .. parentGallery.fullurlpath
     if parentCollection and (not parent.remoteCollectionId or parentCollection:getRemoteId() ~= parent.remoteCollectionId or parentCollection:getRemoteUrl() ~= parentGallery.fullurl) then
@@ -372,12 +379,34 @@ function PhotoDeckAPI.createOrUpdateGallery(urlname, name, collectionInfo)
         parentCollection:setRemoteUrl(parentGallery.fullurl)
       end)
     end
+
+    parentGalleryId = parentGallery.uuid -- our parent gallery is now this one
+  end
+
+  -- Find PhotoDeck gallery
+  local gallery = nil
+  local galleryId = collection:getRemoteId()
+  if galleryId then
+    -- find by remote ID if known
+    gallery = PhotoDeckAPI.gallery(urlname, galleryId)
+  end
+  if not gallery then
+    -- not found, search by name
+    if not galleries then
+      galleries, error_msg = PhotoDeckAPI.galleries(urlname)
+      if error_msg then
+        return nil, error_msg
+      end
+    end
+    gallery = galleries[name]
   end
 
   if gallery then
-    gallery, error_msg = PhotoDeckAPI.updateGallery(urlname, gallery.uuid, name, collection, parentGallery.uuid)
+    -- PhotoDeck gallery found, update
+    gallery, error_msg = PhotoDeckAPI.updateGallery(urlname, gallery.uuid, name, collection, parentGalleryId)
   else
-    gallery, error_msg = PhotoDeckAPI.createGallery(urlname, name, collection, parentGallery.uuid)
+    -- PhotoDeck gallery not found, create
+    gallery, error_msg = PhotoDeckAPI.createGallery(urlname, name, collection, parentGalleryId)
   end
   if error_msg then
     return gallery, error_msg

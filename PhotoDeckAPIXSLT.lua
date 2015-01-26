@@ -46,6 +46,7 @@ t["<xsl:value-of select='urlname'/>"] = {
      hostname = "<xsl:value-of select='hostname'/>",
      homeurl = "<xsl:value-of select='home-url'/>",
      title = "<xsl:value-of select='title'/>",
+     rootgalleryid = "<xsl:value-of select='root-gallery-uuid'/>",
 }
     </xsl:for-each>
 return t
