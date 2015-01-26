@@ -46,7 +46,7 @@ t["<xsl:value-of select='urlname'/>"] = {
      hostname = "<xsl:value-of select='hostname'/>",
      homeurl = "<xsl:value-of select='home-url'/>",
      title = "<xsl:value-of select='title'/>",
-     rootgalleryid = "<xsl:value-of select='root-gallery-uuid'/>",
+     rootgalleryuuid = "<xsl:value-of select='root-gallery-uuid'/>",
 }
     </xsl:for-each>
 return t
@@ -57,13 +57,6 @@ PhotoDeckAPIXSLT.galleries = xsltheader .. [[
   <xsl:template match='/reply/galleries'>
 local t = {}
     <xsl:for-each select='gallery'>
-t["<xsl:value-of select='name'/>"] = {
-     fullurlpath = "<xsl:value-of select='full-url-path'/>",
-     name = "<xsl:value-of select='name'/>",
-     uuid = "<xsl:value-of select='uuid'/>",
-     urlpath = "<xsl:value-of select='url-path'/>",
-     parentuuid = "<xsl:value-of select='parent-uuid'/>",
-}
 t["<xsl:value-of select='uuid'/>"] = {
      fullurlpath = "<xsl:value-of select='full-url-path'/>",
      name = "<xsl:value-of select='name'/>",
@@ -134,6 +127,22 @@ local t = {
     "<xsl:value-of select='uuid'/>",
    </xsl:for-each>
 }
+return t
+  </xsl:template>
+]] .. xsltfooter
+
+PhotoDeckAPIXSLT.subGalleriesInGallery = xsltheader .. [[
+  <xsl:template match='/reply/galleries'>
+local t = {}
+    <xsl:for-each select='gallery'>
+t["<xsl:value-of select='uuid'/>"] = {
+     name = "<xsl:value-of select='name'/>",
+     parentuuid = "<xsl:value-of select='parent-uuid'/>",
+     subgalleriescount = "<xsl:value-of select='subgalleries-count'/>",
+     page = "<xsl:value-of select='page'/>",
+     totalpages = "<xsl:value-of select='total-pages'/>"
+}
+    </xsl:for-each>
 return t
   </xsl:template>
 ]] .. xsltfooter
