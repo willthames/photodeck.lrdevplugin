@@ -485,25 +485,39 @@ function PhotoDeckAPI.subGalleriesInGallery(urlname, galleryId)
   logger:trace(string.format('PhotoDeckAPI.subGalleriesInGallery("%s", "%s")', urlname, galleryId))
   local url = '/websites/' .. urlname .. '/galleries/' .. galleryId .. '/subgalleries.xml'
 
+  local galleries
   local subgalleries = {}
-  local response, error_msg = PhotoDeckAPI.request('GET', url, { per_page = 9999 })
-  local galleries = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.subGalleriesInGallery)
+  local response
+  local error_msg = nil
+  local page = 0
+  local totalPages = 1
+  while not error_msg and page < totalPages do
+    page = page + 1
+    response, error_msg = PhotoDeckAPI.request('GET', url, { page = page, per_page = 100 })
+    galleries = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.subGalleriesInGallery)
+    --logger:trace("PhotoDeckAPI.subGalleriesInGallery " .. tostring(page) .. "/" .. tostring(totalPages) .. ": " .. printTable(galleries))
   
-  if not galleries and not error_msg then
-    error_msg = "Couldn't get subgalleries"
-  end
+    if not galleries and not error_msg then
+      error_msg = "Couldn't get subgalleries"
+    end
 
-  if not error_msg then
-    -- keep only galleries with parent_uuid matching us
-    if galleries then
-      for uuid, gallery in pairs(galleries) do
-	if gallery.parentuuid == galleryId then
-	  subgalleries[uuid] = gallery
+    if not error_msg then
+      if galleries and galleries[galleryId] and galleries[galleryId].totalpages and galleries[galleryId].totalpages ~= "" then
+        totalPages = tonumber(galleries[galleryId].totalpages)
+      end
+      -- keep only galleries with parent_uuid matching us
+      if galleries then
+        for uuid, gallery in pairs(galleries) do  
+	  if gallery.parentuuid == galleryId then
+	    subgalleries[uuid] = gallery
+          end
         end
       end
     end
-    --logger:trace("PhotoDeckAPI.subGalleriesInGallery: " .. printTable(galleries))
-    return galleries
+  end
+  if not error_msg then
+    --logger:trace("PhotoDeckAPI.subGalleriesInGallery: " .. printTable(subgalleries))
+    return subgalleries
   else
     return nil, error_msg
   end
