@@ -346,6 +346,7 @@ function publishServiceProvider.sectionsForTopOfDialog( f, propertyTable )
 end
 
 function publishServiceProvider.processRenderedPhotos( functionContext, exportContext )
+  logger:trace('publishServiceProvider.processRenderedPhotos')
 
   local exportSession = exportContext.exportSession
   local exportSettings = assert( exportContext.propertyTable )
@@ -385,7 +386,7 @@ function publishServiceProvider.processRenderedPhotos( functionContext, exportCo
     if not collectionInfo.publishedCollection then
       collectionInfo.publishedCollection = exportContext.publishedCollection
     end
-    gallery, error_msg = PhotoDeckAPI.createOrUpdateGallery(urlname, collectionInfo.name, collectionInfo)
+    gallery, error_msg = PhotoDeckAPI.createOrUpdateGallery(urlname, collectionInfo)
     if error_msg then
       progressScope:done()
       LrErrors.throwUserError("Error creating gallery: " .. error_msg)
@@ -487,8 +488,8 @@ function publishServiceProvider.processRenderedPhotos( functionContext, exportCo
 end
 
 publishServiceProvider.deletePhotosFromPublishedCollection = function( publishSettings, arrayOfPhotoIds, deletedCallback, localCollectionId )
+  logger:trace('publishServiceProvider.deletePhotosFromPublishedCollection')
   PhotoDeckAPI.connect(publishSettings.apiKey, publishSettings.apiSecret, publishSettings.username, publishSettings.password)
-  --logger:trace('deletePhotosFromPublishedCollection')
   local catalog = LrApplication.activeCatalog()
   local collection = catalog:getPublishedCollectionByLocalIdentifier(localCollectionId)
   local galleryId = collection:getRemoteId()
@@ -588,38 +589,48 @@ publishServiceProvider.viewForCollectionSettings = function( f, publishSettings,
 end
 
 publishServiceProvider.updateCollectionSettings = function( publishSettings, info )
+  logger:trace('publishServiceProvider.updateCollectionSettings')
+  PhotoDeckAPI.connect(publishSettings.apiKey, publishSettings.apiSecret, publishSettings.username, publishSettings.password)
   local urlname = publishSettings.websiteChosen
-  local result, error_msg = PhotoDeckAPI.createOrUpdateGallery(urlname, info.collectionSettings.LR_liveName, info)
+  local result, error_msg = PhotoDeckAPI.createOrUpdateGallery(urlname, info)
   if error_msg then
     LrErrors.throwUserError("Error updating gallery: " .. error_msg)
   end
 end
 
 publishServiceProvider.updateCollectionSetSettings = function( publishSettings, info )
+  logger:trace('publishServiceProvider.updateCollectionSetSettings')
+  PhotoDeckAPI.connect(publishSettings.apiKey, publishSettings.apiSecret, publishSettings.username, publishSettings.password)
   local urlname = publishSettings.websiteChosen
-  local result, error_msg = PhotoDeckAPI.createOrUpdateGallery(urlname, info.name, info)
+  local result, error_msg = PhotoDeckAPI.createOrUpdateGallery(urlname, info)
   if error_msg then
     LrErrors.throwUserError("Error updating gallery: " .. error_msg)
   end
 end
 
 publishServiceProvider.renamePublishedCollection = function( publishSettings, info )
+  logger:trace('publishServiceProvider.renamePublishedCollection')
+  PhotoDeckAPI.connect(publishSettings.apiKey, publishSettings.apiSecret, publishSettings.username, publishSettings.password)
   local urlname = publishSettings.websiteChosen
-  local result, error_msg = PhotoDeckAPI.createOrUpdateGallery(urlname, info.name, info)
+  local result, error_msg = PhotoDeckAPI.createOrUpdateGallery(urlname, info)
   if error_msg then
     LrErrors.throwUserError("Error renaming gallery: " .. error_msg)
   end
 end
 
 publishServiceProvider.reparentPublishedCollection = function( publishSettings, info )
+  logger:trace('publishServiceProvider.reparentPublishedCollection')
+  PhotoDeckAPI.connect(publishSettings.apiKey, publishSettings.apiSecret, publishSettings.username, publishSettings.password)
   local urlname = publishSettings.websiteChosen
-  local result, error_msg = PhotoDeckAPI.createOrUpdateGallery(urlname, info.name, info)
+  local result, error_msg = PhotoDeckAPI.createOrUpdateGallery(urlname, info)
   if error_msg then
     LrErrors.throwUserError("Error reparenting gallery: " .. error_msg)
   end
 end
 
 publishServiceProvider.deletePublishedCollection = function( publishSettings, info )
+  logger:trace('publishServiceProvider.deletePublishedCollection')
+  PhotoDeckAPI.connect(publishSettings.apiKey, publishSettings.apiSecret, publishSettings.username, publishSettings.password)
   local urlname = publishSettings.websiteChosen
   local galleryId = info.remoteId
   local result, error_msg = PhotoDeckAPI.deleteGallery(urlname, galleryId)

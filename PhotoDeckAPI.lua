@@ -282,22 +282,21 @@ function PhotoDeckAPI.gallery(urlname, galleryId)
   return result, error_msg
 end
 
-local function buildGalleryInfoFromLrCollection(collection)
+local function buildGalleryInfoFromLrCollectionInfo(collectionInfo)
   local galleryInfo = {}
-  if collection.getCollectionInfoSummary then
-    local info = collection:getCollectionInfoSummary().collectionSettings
-    galleryInfo['gallery[description]'] = info['description']
-    galleryInfo['gallery[display_style]'] = info['display_style']
+  galleryInfo['gallery[name]'] = collectionInfo.name
+  local collectionSettings = collectionInfo.collectionSettings
+  if collectionSettings then
+    galleryInfo['gallery[description]'] = collectionSettings['description']
+    galleryInfo['gallery[display_style]'] = collectionSettings['display_style']
   end
   return galleryInfo
 end
 
-function PhotoDeckAPI.createGallery(urlname, name, collection, parentId)
-  logger:trace(string.format('PhotoDeckAPI.createGallery("%s", "%s", <collection>, "%s")', urlname, name, parentId))
-  local galleryInfo = buildGalleryInfoFromLrCollection(collection)
+function PhotoDeckAPI.createGallery(urlname, parentId, collectionInfo)
+  logger:trace(string.format('PhotoDeckAPI.createGallery("%s", "%s", <collectionInfo>)', urlname, parentId))
+  local galleryInfo = buildGalleryInfoFromLrCollectionInfo(collectionInfo)
   galleryInfo['gallery[parent]'] = parentId
-  galleryInfo['gallery[name]'] = name
-  --logger:trace(printTable(galleryInfo))
   local response, error_msg = PhotoDeckAPI.request('POST', '/websites/' .. urlname .. '/galleries.xml', galleryInfo)
   local result = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.createGallery)
 
@@ -309,13 +308,10 @@ function PhotoDeckAPI.createGallery(urlname, name, collection, parentId)
   return gallery, error_msg
 end
 
-function PhotoDeckAPI.updateGallery(urlname, galleryId, newname, collection, parentId)
-  logger:trace(string.format('PhotoDeckAPI.updateGallery("%s", "%s", ...)', urlname, galleryId))
-  local galleryInfo = buildGalleryInfoFromLrCollection(collection)
-  galleryInfo['gallery[name]'] = newname
+function PhotoDeckAPI.updateGallery(urlname, galleryId, parentId, collectionInfo)
+  logger:trace(string.format('PhotoDeckAPI.updateGallery("%s", "%s", "%s", <collectionInfo>)', urlname, galleryId, parentId))
+  local galleryInfo = buildGalleryInfoFromLrCollectionInfo(collectionInfo)
   galleryInfo['gallery[parent]'] = parentId
-  galleryInfo['gallery[url_path]'] = string.gsub(newname:lower(), ' ', '-')
-  --logger:trace(printTable(galleryInfo))
   local response, error_msg = PhotoDeckAPI.request('PUT', '/websites/' .. urlname .. '/galleries/' .. galleryId .. '.xml', galleryInfo)
 
   if error_msg then
@@ -327,8 +323,8 @@ function PhotoDeckAPI.updateGallery(urlname, galleryId, newname, collection, par
 end
 
 
-function PhotoDeckAPI.createOrUpdateGallery(urlname, name, collectionInfo)
-  logger:trace(string.format('PhotoDeckAPI.createOrUpdateGallery("%s", "%s", <collectionInfo>)', urlname, name))
+function PhotoDeckAPI.createOrUpdateGallery(urlname, collectionInfo)
+  logger:trace(string.format('PhotoDeckAPI.createOrUpdateGallery("%s", <collectionInfo>)', urlname))
 
   local website, error_msg = PhotoDeckAPI.website(urlname)
   if error_msg then
@@ -337,25 +333,39 @@ function PhotoDeckAPI.createOrUpdateGallery(urlname, name, collectionInfo)
 
   local collection = collectionInfo.publishedCollection
 
-  local rootGalleryId = website.rootgalleryuuid
-  if not rootGalleryId or rootGalleryId == "" then
-    return nil, "Couldn't find root gallery"
-  end
-
-  local parentGalleryId = rootGalleryId -- by default, our parent gallery is the root gallery
+  local parentGalleryId = nil
   local parentJustCreated = false
 
-  -- Find PhotoDeck gallery
+  -- Find PhotoDeck gallery and parent gallery
   local gallery = nil
   local galleryId = collection:getRemoteId()
   if galleryId then
     -- find by remote ID if known
     gallery = PhotoDeckAPI.gallery(urlname, galleryId)
+
+    if gallery then
+      -- check LR parent and see if we the PD gallery is still properly connected
+      for _, parent in pairs(collectionInfo.parents) do
+        if parent.remoteCollectionId == gallery.parentuuid then
+          -- ok, found, no need to go back to all parents one by one to reconnect everything
+          parentGalleryId = gallery.parentuuid
+	  break
+        end
+      end
+    end
   end
 
 
-  if not gallery then
+  if not gallery or not parentGalleryId then
     -- Find PhotoDeck parent galleries, create if missing and connect them to LightRoom if not already done
+
+    -- Start from the root gallery
+    parentGalleryId = website.rootgalleryuuid
+    if not parentGalleryId or parentGalleryId == "" then
+      return nil, "Couldn't find root gallery"
+    end
+
+    -- Now iterate over each parent, starting from the top level
     for _, parent in pairs(collectionInfo.parents) do
       local parentGallery = nil
       local parentId = parent.remoteCollectionId
@@ -382,7 +392,7 @@ function PhotoDeckAPI.createOrUpdateGallery(urlname, name, collectionInfo)
       end
       if not parentGallery then
         -- not found, create
-        parentGallery, error_msg = PhotoDeckAPI.createGallery(urlname, parent.name, parent, parentGalleryId)
+        parentGallery, error_msg = PhotoDeckAPI.createGallery(urlname, parentGalleryId, parent:getCollectionInfoSummary())
         if error_msg then
           return nil, error_msg
         end
@@ -411,7 +421,7 @@ function PhotoDeckAPI.createOrUpdateGallery(urlname, name, collectionInfo)
         return nil, error_msg
       end
       for uuid, subgallery in pairs(subgalleries) do
-        if subgallery.name == name then
+        if subgallery.name == collectionInfo.name then
   	  gallery, error_msg = PhotoDeckAPI.gallery(urlname, uuid)
           if error_msg or not gallery then
             return nil, error_msg or "Couldn't get subgallery"
@@ -424,10 +434,10 @@ function PhotoDeckAPI.createOrUpdateGallery(urlname, name, collectionInfo)
 
   if gallery then
     -- PhotoDeck gallery found, update
-    gallery, error_msg = PhotoDeckAPI.updateGallery(urlname, gallery.uuid, name, collection, parentGalleryId)
+    gallery, error_msg = PhotoDeckAPI.updateGallery(urlname, gallery.uuid, parentGalleryId, collectionInfo)
   else
     -- PhotoDeck gallery not found, create
-    gallery, error_msg = PhotoDeckAPI.createGallery(urlname, name, collection, parentGalleryId)
+    gallery, error_msg = PhotoDeckAPI.createGallery(urlname, parentGalleryId, collectionInfo)
   end
   if error_msg then
     return gallery, error_msg

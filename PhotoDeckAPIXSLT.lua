@@ -76,6 +76,7 @@ local t = {
      name = "<xsl:value-of select='name'/>",
      uuid = "<xsl:value-of select='uuid'/>",
      urlpath = "<xsl:value-of select='url-path'/>",
+     parentuuid = "<xsl:value-of select='parent-uuid'/>",
 }
 return t
   </xsl:template>
