@@ -323,7 +323,7 @@ function PhotoDeckAPI.updateGallery(urlname, galleryId, parentId, collectionInfo
 end
 
 
-function PhotoDeckAPI.createOrUpdateGallery(urlname, collectionInfo)
+function PhotoDeckAPI.createOrUpdateGallery(urlname, collectionInfo, updateSettings)
   logger:trace(string.format('PhotoDeckAPI.createOrUpdateGallery("%s", <collectionInfo>)', urlname))
 
   local website, error_msg = PhotoDeckAPI.website(urlname)
@@ -433,8 +433,37 @@ function PhotoDeckAPI.createOrUpdateGallery(urlname, collectionInfo)
   end
 
   if gallery then
-    -- PhotoDeck gallery found, update
-    gallery, error_msg = PhotoDeckAPI.updateGallery(urlname, gallery.uuid, parentGalleryId, collectionInfo)
+    -- PhotoDeck gallery found, update if necessary
+    local changed = gallery.parentuuid ~= parentGalleryId or gallery.name ~= collectionInfo.name
+
+    local settingsChanged = false
+    if updateSettings then
+      -- User has edited the gallery settings (ie, description and/or display style), so update gallery if changed
+      collectionSettings = collectionInfo.collectionSettings
+      if collectionSettings then
+        if not settingsChanged and collectionSettings['description'] and collectionSettings['description'] ~= '' then
+          settingsChanged = collectionSettings['description'] ~= gallery.description
+        end
+        if not settingsChanged and collectionSettings['display_style'] and collectionSettings['display_style'] ~= '' then
+          settingsChanged = collectionSettings['display_style'] ~= gallery.displaystyle
+        end
+
+	changed = changed or settingsChanged
+      end
+    end
+
+    if changed then
+      gallery, error_msg = PhotoDeckAPI.updateGallery(urlname, gallery.uuid, parentGalleryId, collectionInfo)
+
+      if not error_msg and settingsChanged then
+        -- resynchronize LR published collection settings with the actual data in PhotoDeck
+	collectionSettings['description'] = gallery.description
+	collectionSettings['display_style'] = gallery.displaystyle
+	collection.catalog:withWriteAccessDo('Resynchronize LR collection settings', function()
+	  collection:setCollectionSettings(collectionSettings)
+	end)
+      end
+    end
   else
     -- PhotoDeck gallery not found, create
     gallery, error_msg = PhotoDeckAPI.createGallery(urlname, parentGalleryId, collectionInfo)

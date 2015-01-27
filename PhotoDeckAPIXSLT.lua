@@ -61,8 +61,10 @@ t["<xsl:value-of select='uuid'/>"] = {
      fullurlpath = "<xsl:value-of select='full-url-path'/>",
      name = "<xsl:value-of select='name'/>",
      uuid = "<xsl:value-of select='uuid'/>",
+     description = "<xsl:value-of select='description'/>",
      urlpath = "<xsl:value-of select='url-path'/>",
      parentuuid = "<xsl:value-of select='parent-uuid'/>",
+     displaystyle = "<xsl:value-of select='gallery-display-style-uuid'/>",
 }
    </xsl:for-each>
 return t
@@ -75,8 +77,10 @@ local t = {
      fullurlpath = "<xsl:value-of select='full-url-path'/>",
      name = "<xsl:value-of select='name'/>",
      uuid = "<xsl:value-of select='uuid'/>",
+     description = "<xsl:value-of select='description'/>",
      urlpath = "<xsl:value-of select='url-path'/>",
      parentuuid = "<xsl:value-of select='parent-uuid'/>",
+     displaystyle = "<xsl:value-of select='gallery-display-style-uuid'/>",
 }
 return t
   </xsl:template>

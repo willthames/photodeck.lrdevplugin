@@ -592,7 +592,7 @@ publishServiceProvider.updateCollectionSettings = function( publishSettings, inf
   logger:trace('publishServiceProvider.updateCollectionSettings')
   PhotoDeckAPI.connect(publishSettings.apiKey, publishSettings.apiSecret, publishSettings.username, publishSettings.password)
   local urlname = publishSettings.websiteChosen
-  local result, error_msg = PhotoDeckAPI.createOrUpdateGallery(urlname, info)
+  local result, error_msg = PhotoDeckAPI.createOrUpdateGallery(urlname, info, true)
   if error_msg then
     LrErrors.throwUserError("Error updating gallery: " .. error_msg)
   end
@@ -602,7 +602,7 @@ publishServiceProvider.updateCollectionSetSettings = function( publishSettings, 
   logger:trace('publishServiceProvider.updateCollectionSetSettings')
   PhotoDeckAPI.connect(publishSettings.apiKey, publishSettings.apiSecret, publishSettings.username, publishSettings.password)
   local urlname = publishSettings.websiteChosen
-  local result, error_msg = PhotoDeckAPI.createOrUpdateGallery(urlname, info)
+  local result, error_msg = PhotoDeckAPI.createOrUpdateGallery(urlname, info, true)
   if error_msg then
     LrErrors.throwUserError("Error updating gallery: " .. error_msg)
   end
