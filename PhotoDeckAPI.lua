@@ -14,7 +14,14 @@ local urlprefix = 'http://api.photodeck.com'
 local isTable = PhotoDeckUtils.isTable
 local printTable = PhotoDeckUtils.printTable
 
-local PhotoDeckAPI = {}
+local PhotoDeckAPI = {
+  key = '',
+  secret = '',
+  password = '',
+  loggedin = false,
+  canSynchronize = true
+}
+
 local PhotoDeckAPICache = {}
 
 -- sign API request according to docs at
@@ -123,8 +130,12 @@ local function handle_response(seq, response, resp_headers, onerror)
     --if resp_headers then
     --  logger:error(PhotoDeckUtils.printLrTable(resp_headers))
     --end
+    if status_code == "401" or status_code == "999" then
+      PhotoDeckAPI.loggedin = false
+    end
     logger:error(string.format(' %s <- %s [%s]: %s', seq, status_code, request_id, error_msg))
   else
+    PhotoDeckAPI.loggedin = true
     logger:trace(string.format(' %s <- %s [%s]', seq, status_code, request_id))
   end
 
@@ -198,6 +209,11 @@ end
 function PhotoDeckAPI.connect(key, secret, username, password)
   PhotoDeckAPI.key = key
   PhotoDeckAPI.secret = secret
+
+  if PhotoDeckAPI.loggedin and PhotoDeckAPI.username ~= username then
+    PhotoDeckAPI.logout()
+  end
+
   PhotoDeckAPI.username = username
   PhotoDeckAPI.password = password
   PhotoDeckAPI.loggedin = false
@@ -210,20 +226,23 @@ function PhotoDeckAPI.ping(text)
     t = { text = text }
   end
   local response, error_msg = PhotoDeckAPI.request('GET', '/ping.xml', t)
-  local result = error_msg
-  if not error_msg then
-    result = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.ping)
-    if not result or result == "" then
-      result = error_msg
-    end
-  end
+  local result = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.ping)
   return result, error_msg
+end
+
+function PhotoDeckAPI.logout()
+  logger:trace('PhotoDeckAPI.logout()')
+  local response, error_msg = PhotoDeckAPI.request('GET', '/logout.xml')
+  return response, error_msg
 end
 
 function PhotoDeckAPI.whoami()
   logger:trace('PhotoDeckAPI.whoami()')
   local response, error_msg = PhotoDeckAPI.request('GET', '/whoami.xml')
   local result = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.whoami)
+  if not result or not result.email or result.email == '' then
+    PhotoDeckAPI.loggedin = false
+  end
   -- logger:trace(printTable(result))
   return result, error_msg
 end

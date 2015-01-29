@@ -94,6 +94,10 @@ local function chooseWebsite(propertyTable)
   return propertyTable
 end
 
+local function onWebsiteSelect(propertyTable, key, value)
+  propertyTable.websiteName = propertyTable.websites[value].title
+end
+
 local function chooseGalleryDisplayStyle(propertyTable, collectionInfo)
   local f = LrView.osFactory()
   local c = f:row {
@@ -112,28 +116,60 @@ local function chooseGalleryDisplayStyle(propertyTable, collectionInfo)
 end
 
 local function ping(propertyTable)
-  propertyTable.pingResult = 'Connecting to PhotoDeck...'
-  PhotoDeckAPI.connect(propertyTable.apiKey, propertyTable.apiSecret)
+  propertyTable.connectionStatus = 'Connecting to PhotoDeck...'
   LrTasks.startAsyncTask(function()
-    propertyTable.pingResult = PhotoDeckAPI.ping()
+    PhotoDeckAPI.connect(propertyTable.apiKey, propertyTable.apiSecret, propertyTable.username, propertyTable.password)
+    local ping, error_msg = PhotoDeckAPI.ping()
+    if error_msg then
+      propertyTable.connectionStatus = "Connection failed: " .. error_msg
+    else
+      propertyTable.connectionStatus = "Connected"
+    end
   end, 'PhotoDeckAPI Ping')
 end
 
 local function login(propertyTable)
-  propertyTable.loggedinResult = 'Logging in...'
-  PhotoDeckAPI.connect(propertyTable.apiKey,
-       propertyTable.apiSecret, propertyTable.username, propertyTable.password)
+  propertyTable.connectionStatus = 'Logging in...'
   LrTasks.startAsyncTask(function()
+    PhotoDeckAPI.connect(propertyTable.apiKey, propertyTable.apiSecret, propertyTable.username, propertyTable.password)
     local result, error_msg = PhotoDeckAPI.whoami()
     if error_msg then
-      propertyTable.loggedin = false
-      propertyTable.loggedinResult = error_msg
-    elseif not result.email or result.email == '' then
-      propertyTable.loggedin = false
-      propertyTable.loggedinResult = "Couldn't log in using those credentials"
+      propertyTable.connectionStatus = error_msg
+    elseif not PhotoDeckAPI.loggedin then
+      propertyTable.connectionStatus = "Couldn't log in using those credentials"
     else
-      propertyTable.loggedin = true
-      propertyTable.loggedinResult = 'Logged in as ' .. result.firstname .. ' ' .. result.lastname
+      propertyTable.connectionStatus = 'Logged in as ' .. result.firstname .. ' ' .. result.lastname
+    end
+    propertyTable.loggedin = PhotoDeckAPI.loggedin
+    
+    if PhotoDeckAPI.loggedin then
+      -- get available websites
+      websites, error_msg = PhotoDeckAPI.websites()
+      if error_msg then
+        propertyTable.connectionStatus = "Couldn't get your website: " .. error_msg
+        propertyTable.loggedin = PhotoDeckAPI.loggedin
+      else
+        propertyTable.websites = websites
+	local websitesCount = 0
+	local firstWebsite = nil
+	local foundCurrent = false
+        for k, v in pairs(propertyTable.websites) do
+	  websitesCount = websitesCount + 1
+          if not firstWebsite then
+	    firstWebsite = k
+          end
+	  if k == propertyTable.websiteChosen then
+	    foundCurrent = true
+	  end
+          table.insert(propertyTable.websiteChoices, { title = v.title, value = k })
+        end
+	if not foundCurrent then
+          -- automatically select first website
+	  propertyTable.websiteChosen = firstWebsite
+	end
+        propertyTable.multipleWebsites = websitesCount > 1
+        onWebsiteSelect(propertyTable, nil, propertyTable.websiteChosen)
+      end
     end
   end, 'PhotoDeckAPI Login')
 end
@@ -157,9 +193,8 @@ end
 
 local function getGalleryDisplayStyles(propertyTable, collectionInfo)
   collectionInfo.galleryDisplayStyles = {}
-  PhotoDeckAPI.connect(propertyTable.apiKey,
-       propertyTable.apiSecret, propertyTable.username, propertyTable.password)
   LrTasks.startAsyncTask(function()
+    PhotoDeckAPI.connect(propertyTable.apiKey, propertyTable.apiSecret, propertyTable.username, propertyTable.password)
     local galleryDisplayStyles, error_msg = PhotoDeckAPI.galleryDisplayStyles(propertyTable.websiteChosen)
     if galleryDisplayStyles and not error_msg then
       for k, v in pairs(galleryDisplayStyles) do
@@ -172,43 +207,23 @@ local function getGalleryDisplayStyles(propertyTable, collectionInfo)
   end, 'PhotoDeckAPI Get Gallery Display Styles')
 end
 
-local function onWebsiteSelect(propertyTable, key, value)
-  propertyTable.websiteName = propertyTable.websites[value].title
-end
-
-local function getWebsites(propertyTable)
-  PhotoDeckAPI.connect(propertyTable.apiKey,
-       propertyTable.apiSecret, propertyTable.username, propertyTable.password)
-  LrTasks.startAsyncTask(function()
-    websites, error_msg = PhotoDeckAPI.websites()
-    if not error_msg then
-      propertyTable.websites = websites
-      for k, v in pairs(propertyTable.websites) do
-        table.insert(propertyTable.websiteChoices, { title = v.title, value = k })
-      end
-      if propertyTable.websiteChosen and propertyTable.websiteChosen ~= '' then
-        onWebsiteSelect(propertyTable, nil, propertyTable.websiteChosen)
-      end
-    end
-  end, 'PhotoDeckAPI Get Websites')
-end
-
 function publishServiceProvider.startDialog(propertyTable)
   propertyTable.loggedin = false
   propertyTable.websiteChoices = {}
   propertyTable.galleryDisplayStyles = {}
+  propertyTable.multipleWebsites = false
   propertyTable.websiteName = ''
   if not propertyTable.apiKey or propertyTable.apiKey == ''
     or not propertyTable.apiSecret or propertyTable.apiSecret == '' then
     propertyTable = updateApiKeyAndSecret(propertyTable)
   end
-  ping(propertyTable)
   if propertyTable.username and propertyTable.username ~= '' and
      propertyTable.password and propertyTable.password ~= '' and
      propertyTable.apiKey and propertyTable.apiKey ~= '' and
      propertyTable.apiSecret and propertyTable.apiSecret ~= '' then
     login(propertyTable)
-    getWebsites(propertyTable)
+  else
+    ping(propertyTable)
   end
 
   propertyTable:addObserver('websiteChosen', onWebsiteSelect)
@@ -216,12 +231,11 @@ end
 
 function publishServiceProvider.sectionsForTopOfDialog( f, propertyTable )
   -- LrMobdebug.on()
-  propertyTable.pingResult = 'Awaiting instructions'
-  propertyTable.loggedinResult = 'Not logged in'
+  propertyTable.connectionStatus = 'Not logged in'
 
   local apiCredentials =  {
     title = LOC "$$$/PhotoDeck/ExportDialog/Account=PhotoDeck Plugin API keys",
-    synopsis = LrView.bind 'pingResult',
+    synopsis = LrView.bind 'connectionStatus',
 
     f:row {
       bind_to_object = propertyTable,
@@ -251,23 +265,15 @@ function publishServiceProvider.sectionsForTopOfDialog( f, propertyTable )
       },
       f:column {
         f:push_button {
-          title = 'Update',
-          enabled = true,
-          action = function()
-            propertyTable = updateApiKeyAndSecret(propertyTable)
-          end,
-        },
-        f:static_text {
-          title = LrView.bind 'pingResult',
-          alignment = 'right',
-          fill_horizontal = 1,
+          title = 'Change',
+          action = function() propertyTable = updateApiKeyAndSecret(propertyTable) end,
         },
       },
     },
   }
-  local userCredentials = {
+  local userAccount = {
     title = LOC "$$$/PhotoDeck/ExportDialog/Account=PhotoDeck Account",
-    synopsis = LrView.bind 'loggedinResult',
+    synopsis = LrView.bind 'connectionStatus',
 
     f:row {
       bind_to_object = propertyTable,
@@ -280,7 +286,7 @@ function publishServiceProvider.sectionsForTopOfDialog( f, propertyTable )
           },
           f:edit_field {
             value = LrView.bind 'username',
-            width_in_chars = 20,
+            width = 300,
           }
         },
         f:row {
@@ -291,50 +297,64 @@ function publishServiceProvider.sectionsForTopOfDialog( f, propertyTable )
           },
           f:password_field {
             value = LrView.bind 'password',
-            width_in_chars = 20,
+            width = 300,
           }
         },
       },
 
-      f:push_button {
-        width = tonumber( LOC "$$$/locale_metric/PhotoDeck/ExportDialog/TestButton/Width=90" ),
-        title = 'Login',
-        enabled = LrBinding.negativeOfKey('loggedin'),
-        action = function ()
-          login(propertyTable)
-          getWebsites(propertyTable)
-        end
+      f:column {
+        f:push_button {
+          title = 'Login',
+          enabled = LrBinding.negativeOfKey('loggedin'),
+          action = function () login(propertyTable) end
+        },
       },
-
-      f:static_text {
-        title = LrView.bind 'loggedinResult',
-        alignment = 'right',
-        fill_horizontal = 1,
-        height_in_lines = 1,
-      },
-
     },
-  }
-  local websiteChoice = {
-    title = LOC "$$$/PhotoDeck/ExportDialog/Account=PhotoDeck Website",
-    synopsis = LrView.bind 'websiteName',
 
     f:row {
       bind_to_object = propertyTable,
-
-      f:push_button {
-        title = 'Choose website',
-        action = function() propertyTable = chooseWebsite(propertyTable) end,
-        enabled = LrView.bind 'loggedin'
+      f:column {
+        f:static_text {
+          title = "",
+          width = LrView.share "user_label_width",
+          alignment = 'right'
+        },
       },
-      f:static_text {
-        title = LrView.bind 'websiteName',
-        width_in_chars = 40,
-      }
+      f:column {
+        f:static_text {
+          title = LrView.bind 'connectionStatus',
+	  width = 300,
+        },
+      },
+    },
+
+    f:row {
+      bind_to_object = propertyTable,
+      f:column {
+	f:row {
+          f:static_text {
+            title = "Website:",
+            width = LrView.share "user_label_width",
+            alignment = 'right'
+          },
+          f:static_text {
+            title = LrView.bind 'websiteName',
+            width = 300,
+          }
+        },
+      },
+
+      f:column {
+        f:push_button {
+          title = 'Change',
+	  enabled = LrBinding.andAllKeys('loggedin', 'multipleWebsites'),
+          action = function() propertyTable = chooseWebsite(propertyTable) end,
+        },
+      },
     }
   }
   local publishSettings = {
-    title = LOC "$$$/PhotoDeck/ExportDialog/Account=PhotoDeck publish options",
+    title = LOC "$$$/PhotoDeck/ExportDialog/Account=PhotoDeck Publish options",
 
     f:row {
       bind_to_object = propertyTable,
@@ -368,8 +388,7 @@ function publishServiceProvider.sectionsForTopOfDialog( f, propertyTable )
 
   return {
     apiCredentials,
-    userCredentials,
-    websiteChoice,
+    userAccount,
     publishSettings
   }
 end
@@ -380,8 +399,7 @@ function publishServiceProvider.processRenderedPhotos( functionContext, exportCo
   local exportSession = exportContext.exportSession
   local exportSettings = assert( exportContext.propertyTable )
   local nPhotos = exportSession:countRenditions()
-  PhotoDeckAPI.connect(exportSettings.apiKey,
-       exportSettings.apiSecret, exportSettings.username, exportSettings.password)
+  PhotoDeckAPI.connect(exportSettings.apiKey, exportSettings.apiSecret, exportSettings.username, exportSettings.password)
 
   local error_msg
 
