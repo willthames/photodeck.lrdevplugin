@@ -230,7 +230,8 @@ end
 
 function PhotoDeckAPI.websites()
   logger:trace('PhotoDeckAPI.websites()')
-  local result = PhotoDeckAPICache['websites']
+  local cacheKey = 'websites/' .. PhotoDeckAPI.username
+  local result = PhotoDeckAPICache[cacheKey]
   local response, error_msg = nil
   if not result then
     response, error_msg = PhotoDeckAPI.request('GET', '/websites.xml', { view = 'details' })
@@ -244,8 +245,10 @@ function PhotoDeckAPI.websites()
         error_msg = "No websites found"
       end
     end
-    if not error_msg then
-      PhotoDeckAPICache['websites'] = result
+    if error_msg then
+      PhotoDeckAPI.loggedin = false
+    else
+      PhotoDeckAPICache[cacheKey] = result
     end
     -- logger:trace(printTable(result))
   end
@@ -920,7 +923,8 @@ end
 
 function PhotoDeckAPI.galleryDisplayStyles(urlname)
   logger:trace(string.format('PhotoDeckAPI.galleryDisplayStyles("%s")', urlname))
-  local result = PhotoDeckAPICache['gallery_display_styles/' .. urlname]
+  local cacheKey = 'gallery_display_styles/' .. urlname
+  local result = PhotoDeckAPICache[cacheKey]
   local response, error_msg = nil
   if not result then
     local url = '/websites/' .. urlname .. '/gallery_display_styles.xml'
@@ -936,7 +940,7 @@ function PhotoDeckAPI.galleryDisplayStyles(urlname)
       end
     end
     if not error_msg then
-      PhotoDeckAPICache['gallery_display_styles/' .. urlname] = result
+      PhotoDeckAPICache[cacheKey] = result
     end
     --logger:trace('PhotoDeckAPI.galleryDisplayStyles: ' .. printTable(result))
   end
