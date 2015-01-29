@@ -122,8 +122,10 @@ local function ping(propertyTable)
     local ping, error_msg = PhotoDeckAPI.ping()
     if error_msg then
       propertyTable.connectionStatus = "Connection failed: " .. error_msg
-    else
+    elseif propertyTable.loggedin then
       propertyTable.connectionStatus = "Connected"
+    else
+      propertyTable.connectionStatus = "Connected, please log in"
     end
   end, 'PhotoDeckAPI Ping')
 end
@@ -387,10 +389,15 @@ function publishServiceProvider.sectionsForTopOfDialog( f, propertyTable )
       f:push_button {
         title = 'Import existing PhotoDeck galleries',
         action = function()
-		   local result = LrDialogs.confirm("This will import and connect your existing PhotoDeck galleries structure in LightRoom.", "Galleries that are already connected won't be touched.\nGallery content is currently not imported.", "Proceed", "Cancel")
-		   if result == "ok" then
-                     synchronizeGalleries(propertyTable)
-		   end
+                   if not propertyTable.LR_publishService then
+		     -- publish service is not created yet (this is a new unsaved plugin instance)
+		     LrDialogs.message('Please save the settings first!')
+	           else
+		     local result = LrDialogs.confirm("This will import and connect your existing PhotoDeck galleries structure in LightRoom.", "Galleries that are already connected won't be touched.\nGallery content is currently not imported.", "Proceed", "Cancel")
+		     if result == "ok" then
+                       synchronizeGalleries(propertyTable)
+		     end
+	           end
 	end,
 	enabled = LrBinding.andAllKeys('loggedin', 'canSynchronize'),
       },
