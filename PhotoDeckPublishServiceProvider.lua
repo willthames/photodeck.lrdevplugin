@@ -138,6 +138,16 @@ local function login(propertyTable)
   end, 'PhotoDeckAPI Login')
 end
 
+local function synchronizeGalleries(propertyTable)
+  PhotoDeckAPI.connect(propertyTable.apiKey,
+       propertyTable.apiSecret, propertyTable.username, propertyTable.password)
+  propertyTable.synchronizeGalleriesResult = 'In progress...'
+  LrTasks.startAsyncTask(function()
+    local result, error_msg = PhotoDeckAPI.synchronizeGalleries(propertyTable.websiteChosen, propertyTable)
+    propertyTable.synchronizeGalleriesResult  = error_msg or "Finished"
+  end, 'PhotoDeckAPI galleries synchronization')
+end
+
 local function onGalleryDisplayStyleSelect(propertyTable, key, value)
   local chosenStyle = filter(propertyTable.galleryDisplayStyles, function(v) return v.value == value end)
   if #chosenStyle > 0 then
@@ -324,8 +334,7 @@ function publishServiceProvider.sectionsForTopOfDialog( f, propertyTable )
     }
   }
   local publishSettings = {
-    title = LOC "$$$/PhotoDeck/ExportDialog/Account=PhotoDeck publish settings",
-    synopsis = LrView.bind 'websiteName',
+    title = LOC "$$$/PhotoDeck/ExportDialog/Account=PhotoDeck publish options",
 
     f:row {
       bind_to_object = propertyTable,
@@ -334,6 +343,26 @@ function publishServiceProvider.sectionsForTopOfDialog( f, propertyTable )
         title = 'Re-upload photo when re-publishing',
         value = LrView.bind 'uploadOnRepublish'
       }
+    },
+
+    f:row {
+      f:push_button {
+        title = 'Import existing PhotoDeck galleries',
+        action = function()
+		   local result = LrDialogs.confirm("This will import and connect your existing PhotoDeck galleries structure in LightRoom.", "Galleries that are already connected won't be touched.\nGallery content is currently not imported.", "Proceed", "Cancel")
+		   if result == "ok" then
+                     synchronizeGalleries(propertyTable)
+		   end
+	end,
+        enabled = LrView.bind 'loggedin'
+      },
+
+      f:static_text {
+        title = LrView.bind 'synchronizeGalleriesResult',
+        alignment = 'right',
+        fill_horizontal = 1,
+        height_in_lines = 1,
+      },
     }
   }
 

@@ -483,6 +483,266 @@ function PhotoDeckAPI.createOrUpdateGallery(urlname, collectionInfo, updateSetti
   return gallery
 end
 
+function PhotoDeckAPI.synchronizeGalleries(urlname, propertyTable)
+  logger:trace(string.format('PhotoDeckAPI.synchronizeGalleries("%s", <propertyTable>)', urlname))
+  local publishService = propertyTable.LR_publishService
+  local catalog = publishService.catalog
+
+  propertyTable.synchronizeGalleriesResult = 'Connecting to PhotoDeck website...'
+  local website = PhotoDeckAPI.website(urlname)
+  local rootGalleryId = nil
+  if website then
+    rootGalleryId = website.rootgalleryuuid
+  end
+
+  if not rootGalleryId then
+    return nil, "Couldn't find PhotoDeck root gallery"
+  end
+
+  propertyTable.synchronizeGalleriesResult = 'Reading PhotoDeck gallery structure...'
+  local photodeckGalleries, error_msg = PhotoDeckAPI.galleries(urlname)
+
+  if not photodeckGalleries or error_msg then
+    return nil, error_msg or "Couldn't get PhotoDeck gallery structure"
+  end
+
+  local photodeckGalleriesByParent = {}
+  for uuid, gallery in pairs(photodeckGalleries) do
+    if gallery.parentuuid == '' or not gallery.parentuuid then
+      gallery.parentuuid = 'NONE'
+    end
+    if not photodeckGalleriesByParent[gallery.parentuuid] then
+      photodeckGalleriesByParent[gallery.parentuuid] = {}
+    end
+    photodeckGalleriesByParent[gallery.parentuuid][uuid] = gallery
+  end
+
+
+  local synchronizeGallery
+  synchronizeGallery = function(depth, parentPDGalleryUUID, parentLRCollectionSet)
+    local parentPDGallery = photodeckGalleries[parentPDGalleryUUID]
+    propertyTable.synchronizeGalleriesResult = "Synchronizing '" .. parentPDGallery.name .. "'..."
+    logger:trace(string.format("SYNC: Exploring PhotoDeck galleries under %s '%s' at depth %i", parentPDGalleryUUID, parentPDGallery.name, depth))
+    local pdGalleries = photodeckGalleriesByParent[parentPDGalleryUUID]
+    local lrCollectionSets = parentLRCollectionSet:getChildCollectionSets()
+    local lrCollections = parentLRCollectionSet:getChildCollections()
+    
+    -- Scan LightRoom published collections, and connect them to PhotoDeck galleries
+    local lrCollectionsByRemoteId = {}
+    for _, lrc in pairs(lrCollections) do
+      local rid = lrc:getRemoteId()
+      if not rid or rid == '' then
+	-- unconnected published collection, try to connect by name
+	lrcName = lrc:getName()
+	for uuid, gallery in pairs(pdGalleries) do
+	  if lrcName == gallery.name then
+	    -- found matching gallery
+            catalog:withWriteAccessDo('Set Remote Id and Url', function()
+              lrc:setRemoteId(uuid)
+              lrc:setRemoteUrl(gallery.fullurl)
+            end)
+	    rid = uuid
+	    break
+	  end
+	end
+      end
+
+      local gallery = pdGalleries[rid]
+      if not gallery or gallery.parentuuid ~= parentPDGalleryUUID then
+        logger:trace(string.format("SYNC: LightRoom Published Collection %i '%s' is connected to PhotoDeck gallery %s, but it doesn't exist anymore. Deleting Published Collection.", lrc.localIdentifier, lrc:getName(), rid or '(none)'))
+        catalog:withWriteAccessDo('Deleting Published Collection', function()
+          lrc:delete()
+        end)
+      elseif lrCollectionsByRemoteId[rid] then
+        -- duplicate LR collections!
+        lrcd = lrCollectionsByRemoteId[rid]
+	if gallery.name == lrcd:getName() then
+          logger:trace(string.format("SYNC: LightRoom Published Collection %i '%s' is connected to PhotoDeck gallery %s '%s', but we already have Published Collection %i '%s' connected to it. Deleting the former.", lrc.localIdentifier, lrc:getName(), rid, gallery.name, lrcd.localIdentifier, lrcd:getName()))
+          catalog:withWriteAccessDo('Deleting Published Collection', function()
+	    lrc:delete()
+	  end)
+	else
+          logger:trace(string.format("SYNC: LightRoom Published Collection %i '%s' is connected to PhotoDeck gallery %s '%s', but we already have Published Collection %i '%s' connected to it. Deleting the later.", lrc.localIdentifier, lrc:getName(), rid, gallery.name, lrcd.localIdentifier, lrcd:getName()))
+          catalog:withWriteAccessDo('Deleting Published Collection', function()
+	    lrcd:delete()
+	  end)
+        end
+      else
+        lrCollectionsByRemoteId[rid] = lrc
+      end
+    end
+
+    -- Scan LightRoom published collections sets, and connect them to PhotoDeck galleries
+    local lrCollectionSetsByRemoteId = {}
+    for _, lrcs in pairs(lrCollectionSets) do
+      local rid = lrcs:getRemoteId()
+      if not rid or rid == '' then
+	-- unconnected published collection, try to connect by name
+	lrcsName = lrcs:getName()
+	for uuid, gallery in pairs(pdGalleries) do
+	  if lrcsName == gallery.name then
+	    -- found matching gallery
+            catalog:withWriteAccessDo('Set Remote Id and Url', function()
+              lrcs:setRemoteId(uuid)
+              lrcs:setRemoteUrl(gallery.fullurl)
+            end)
+	    rid = uuid
+	    break
+	  end
+	end
+      end
+
+      local gallery = pdGalleries[rid]
+      if not gallery or gallery.parentuuid ~= parentPDGalleryUUID then
+        logger:trace(string.format("SYNC: LightRoom Published Collection Set %i '%s' is connected to PhotoDeck gallery %s, but it doesn't exist anymore. Deleting Published Collection Set.", lrcs.localIdentifier, lrcs:getName(), rid or '(none)'))
+        catalog:withWriteAccessDo('Deleting Published Collection Set', function()
+          lrcs:delete()
+        end)
+      elseif lrCollectionSetsByRemoteId[rid] then
+        -- duplicate LR collections sets!
+        lrcsd = lrCollectionSetsByRemoteId[rid]
+	if gallery.name == lrcsd:getName() then
+          logger:trace(string.format("SYNC: LightRoom Published Collection Set %i '%s' is connected to PhotoDeck gallery %s '%s', but we already have Published Collection Set %i '%s' connected to it. Deleting the former.", lrcs.localIdentifier, lrcs:getName(), rid, gallery.name, lrcsd.localIdentifier, lrcsd:getName()))
+          catalog:withWriteAccessDo('Deleting Published Collection Set', function()
+	    lrcs:delete()
+	  end)
+	else
+          logger:trace(string.format("SYNC: LightRoom Published Collection Set %i '%s' is connected to PhotoDeck gallery %s '%s', but we already have Published Collection Set %i '%s' connected to it. Deleting the later.", lrcs.localIdentifier, lrcs:getName(), rid, gallery.name, lrcsd.localIdentifier, lrcsd:getName()))
+          catalog:withWriteAccessDo('Deleting Published Collection Set', function()
+	    lrcsd:delete()
+	  end)
+        end
+      else
+        lrCollectionSetsByRemoteId[rid] = lrcs
+      end
+    end
+
+    -- Find missing LightRoom published collections / collection sets
+    for uuid, gallery in pairs(pdGalleries) do
+      local lrCollectionSet = lrCollectionSetsByRemoteId[uuid]
+      local lrCollection = lrCollectionsByRemoteId[uuid]
+      local shouldBeACollectionSet = photodeckGalleriesByParent[uuid]
+      local shouldBeACollection = not shouldBeACollectionSet and gallery.mediascount and gallery.mediascount ~= '' and tonumber(gallery.mediascount) > 0
+
+      if lrCollection and shouldBeACollectionSet then
+        logger:trace(string.format("SYNC: PhotoDeck gallery %s '%s' is connected to LightRoom Published Collection %i, but it should be Publish Collection Set. Deleting Published Collection.", uuid, gallery.name, lrCollection.localIdentifier))
+        catalog:withWriteAccessDo('Deleting Published Collection', function()
+	  lrCollection:delete()
+	end)
+	lrCollection = nil
+      end
+
+      if lrCollectionSet and shouldBeACollection then
+        logger:trace(string.format("SYNC: PhotoDeck gallery %s '%s' is connected to LightRoom Published Collection Set %i, but it should be Publish Collection. Deleting Published Collection Set.", uuid, gallery.name, lrCollectionSet.localIdentifier))
+        catalog:withWriteAccessDo('Deleting Published Collection Set', function()
+	  lrCollectionSet:delete()
+	end)
+	lrCollectionSet = nil
+      end
+
+      if lrCollection and lrCollectionSet then
+	-- exists has both a LightRoom Published Collection and Published Collection Set. Choose the right type and delete the other.
+        if shouldBeACollectionSet then
+          logger:trace(string.format("SYNC: PhotoDeck gallery %s '%s' is connected to LightRoom Published Collection Set %i AND to LightRoom Published Collection %i, but it should be Publish Collection Set. Deleting Published Collection.", uuid, gallery.name, lrCollectionSet.localIdentifier, lrCollection.localIdentifier))
+          catalog:withWriteAccessDo('Deleting Published Collection', function()
+	    lrCollection:delete()
+	  end)
+	  lrCollection = nil
+	elseif shouldBeACollection then
+          logger:trace(string.format("SYNC: PhotoDeck gallery %s '%s' is connected to LightRoom Published Collection Set %i AND to LightRoom Published Collection %i, but it should be Publish Collection. Deleting Published Collection Set.", uuid, gallery.name, lrCollectionSet.localIdentifier, lrCollection.localIdentifier))
+          catalog:withWriteAccessDo('Deleting Published Collection Set', function()
+	    lrCollectionSet:delete()
+	  end)
+	  lrCollectionSet = nil
+        else
+          logger:trace(string.format("SYNC: PhotoDeck gallery %s '%s' is connected to LightRoom Published Collection Set %i AND to LightRoom Published Collection %i, and we don't know yet what it should be. Assuming Published Collection, and deleting Published Collection Set.", uuid, gallery.name, lrCollectionSet.localIdentifier, lrCollection.localIdentifier))
+          catalog:withWriteAccessDo('Deleting Published Collection', function()
+	    lrCollection:delete()
+	  end)
+	  lrCollectionSet = nil
+	end
+      end
+
+      if lrCollectionSet then
+	-- Already properly connected, good
+        logger:trace(string.format("SYNC: PhotoDeck gallery %s '%s' already connected to LightRoom Published Collection Set %i. Doing nothing.", uuid, gallery.name, lrCollectionSet.localIdentifier))
+      elseif lrCollection then
+	-- Already properly connected, good
+        logger:trace(string.format("SYNC: PhotoDeck gallery %s '%s' already connected to LightRoom Published Collection %i. Doing nothing.", uuid, gallery.name, lrCollection.localIdentifier))
+      else
+	-- Missing in LightRoom: create
+	local collectionName = gallery.name
+
+	-- Check for duplicate gallery names in this parent gallery: LightRoom does indeed require name uniqueness, but PhotoDeck doesn't
+	local copyCount = 1
+        for uuidN, galleryN in pairs(pdGalleries) do
+	  if galleryN.name == gallery.name then
+	    if uuid == uuidN then
+	      break
+	    else
+	      copyCount = copyCount + 1
+            end
+	  end
+	end
+	if copyCount > 1 then
+          collectionName = collectionName .. ' (' .. tostring(copyCount) .. ')'
+	end
+
+	if shouldBeACollectionSet then
+          logger:trace(string.format("SYNC: PhotoDeck gallery %s '%s' NOT found in LightRoom. Creating Published Collection Set.", uuid, collectionName))
+          catalog:withWriteAccessDo('Creating Published Collection Set', function()
+	    lrCollectionSet = publishService:createPublishedCollectionSet(collectionName, parentLRCollectionSet)
+	  end)
+	  if lrCollectionSet then
+            catalog:withWriteAccessDo('Set Remote Id and Url', function()
+              lrCollectionSet:setRemoteId(uuid)
+              lrCollectionSet:setRemoteUrl(gallery.fullurl)
+	    end)
+	  else
+            logger:trace(string.format("SYNC ERROR: PhotoDeck gallery %s '%s' NOT found in LightRoom, and failed to create Published Collection Set.", uuid, collectionName))
+          end
+        elseif shouldBeACollection then
+          logger:trace(string.format("SYNC: PhotoDeck gallery %s '%s' NOT found in LightRoom. Creating Published Collection.", uuid, collectionName))
+          catalog:withWriteAccessDo('Creating Published Collection', function()
+	    lrCollection = publishService:createPublishedCollection(collectionName, parentLRCollectionSet)
+	  end)
+	  if lrCollection then
+            catalog:withWriteAccessDo('Set Remote Id and Url', function()
+              lrCollection:setRemoteId(uuid)
+              lrCollection:setRemoteUrl(gallery.fullurl)
+	    end)
+	  else
+            logger:trace(string.format("SYNC ERROR: PhotoDeck gallery %s '%s' NOT found in LightRoom, and failed to create Published Collection.", uuid, collectionName))
+	  end
+	else
+          logger:trace(string.format("SYNC: PhotoDeck gallery %s '%s' NOT found in LightRoom. Creating Published Collection by default.", uuid, collectionName))
+          catalog:withWriteAccessDo('Creating Published Collection', function()
+	    lrCollection = publishService:createPublishedCollection(collectionName, parentLRCollectionSet)
+	  end)
+	  if lrCollection then
+            catalog:withWriteAccessDo('Set Remote Id and Url', function()
+              lrCollection:setRemoteId(uuid)
+              lrCollection:setRemoteUrl(gallery.fullurl)
+	    end)
+	  else
+            logger:trace(string.format("SYNC ERROR: PhotoDeck gallery %s '%s' NOT found in LightRoom, and failed to create Published Collection.", uuid, collectionName))
+          end
+        end
+      end
+
+
+      -- Recurse in sub galleries
+      if photodeckGalleriesByParent[uuid] and lrCollectionSet then
+	synchronizeGallery(depth + 1, uuid, lrCollectionSet)
+      end
+    end
+  end
+
+  synchronizeGallery(1, rootGalleryId, publishService)
+
+  return nil
+end
+
 -- getPhoto returns a photo with remote ID uuid, or nil if it does not exist
 function PhotoDeckAPI.getPhoto(photoId)
   logger:trace(string.format('PhotoDeckAPI.getPhoto("%s")', photoId))
