@@ -510,6 +510,15 @@ function PhotoDeckAPI.synchronizeGalleries(urlname, propertyTable)
   local publishService = propertyTable.LR_publishService
   local catalog = publishService.catalog
 
+  if not PhotoDeckAPI.canSynchronize then
+    return nil, "Task already in progress"
+  end
+  PhotoDeckAPI.canSynchronize = false
+
+  local createCount = 0
+  local deleteCount = 0
+  local errorsCount = 0
+
   propertyTable.synchronizeGalleriesResult = 'Connecting to PhotoDeck website...'
   local website = PhotoDeckAPI.website(urlname)
   local rootGalleryId = nil
@@ -518,6 +527,7 @@ function PhotoDeckAPI.synchronizeGalleries(urlname, propertyTable)
   end
 
   if not rootGalleryId then
+    PhotoDeckAPI.canSynchronize = true
     return nil, "Couldn't find PhotoDeck root gallery"
   end
 
@@ -525,6 +535,7 @@ function PhotoDeckAPI.synchronizeGalleries(urlname, propertyTable)
   local photodeckGalleries, error_msg = PhotoDeckAPI.galleries(urlname)
 
   if not photodeckGalleries or error_msg then
+    PhotoDeckAPI.canSynchronize = true
     return nil, error_msg or "Couldn't get PhotoDeck gallery structure"
   end
 
@@ -545,7 +556,7 @@ function PhotoDeckAPI.synchronizeGalleries(urlname, propertyTable)
     local parentPDGallery = photodeckGalleries[parentPDGalleryUUID]
     propertyTable.synchronizeGalleriesResult = "Synchronizing '" .. parentPDGallery.name .. "'..."
     logger:trace(string.format("SYNC: Exploring PhotoDeck galleries under %s '%s' at depth %i", parentPDGalleryUUID, parentPDGallery.name, depth))
-    local pdGalleries = photodeckGalleriesByParent[parentPDGalleryUUID]
+    local pdGalleries = photodeckGalleriesByParent[parentPDGalleryUUID] or {}
     local lrCollectionSets = parentLRCollectionSet:getChildCollectionSets()
     local lrCollections = parentLRCollectionSet:getChildCollections()
     
@@ -575,6 +586,7 @@ function PhotoDeckAPI.synchronizeGalleries(urlname, propertyTable)
         catalog:withWriteAccessDo('Deleting Published Collection', function()
           lrc:delete()
         end)
+	deleteCount = deleteCount + 1
       elseif lrCollectionsByRemoteId[rid] then
         -- duplicate LR collections!
         lrcd = lrCollectionsByRemoteId[rid]
@@ -583,11 +595,13 @@ function PhotoDeckAPI.synchronizeGalleries(urlname, propertyTable)
           catalog:withWriteAccessDo('Deleting Published Collection', function()
 	    lrc:delete()
 	  end)
+	  deleteCount = deleteCount + 1
 	else
           logger:trace(string.format("SYNC: LightRoom Published Collection %i '%s' is connected to PhotoDeck gallery %s '%s', but we already have Published Collection %i '%s' connected to it. Deleting the later.", lrc.localIdentifier, lrc:getName(), rid, gallery.name, lrcd.localIdentifier, lrcd:getName()))
           catalog:withWriteAccessDo('Deleting Published Collection', function()
 	    lrcd:delete()
 	  end)
+	  deleteCount = deleteCount + 1
         end
       else
         lrCollectionsByRemoteId[rid] = lrc
@@ -620,6 +634,7 @@ function PhotoDeckAPI.synchronizeGalleries(urlname, propertyTable)
         catalog:withWriteAccessDo('Deleting Published Collection Set', function()
           lrcs:delete()
         end)
+	deleteCount = deleteCount + 1
       elseif lrCollectionSetsByRemoteId[rid] then
         -- duplicate LR collections sets!
         lrcsd = lrCollectionSetsByRemoteId[rid]
@@ -628,11 +643,13 @@ function PhotoDeckAPI.synchronizeGalleries(urlname, propertyTable)
           catalog:withWriteAccessDo('Deleting Published Collection Set', function()
 	    lrcs:delete()
 	  end)
+	  deleteCount = deleteCount + 1
 	else
           logger:trace(string.format("SYNC: LightRoom Published Collection Set %i '%s' is connected to PhotoDeck gallery %s '%s', but we already have Published Collection Set %i '%s' connected to it. Deleting the later.", lrcs.localIdentifier, lrcs:getName(), rid, gallery.name, lrcsd.localIdentifier, lrcsd:getName()))
           catalog:withWriteAccessDo('Deleting Published Collection Set', function()
 	    lrcsd:delete()
 	  end)
+	  deleteCount = deleteCount + 1
         end
       else
         lrCollectionSetsByRemoteId[rid] = lrcs
@@ -651,6 +668,7 @@ function PhotoDeckAPI.synchronizeGalleries(urlname, propertyTable)
         catalog:withWriteAccessDo('Deleting Published Collection', function()
 	  lrCollection:delete()
 	end)
+	deleteCount = deleteCount + 1
 	lrCollection = nil
       end
 
@@ -659,6 +677,7 @@ function PhotoDeckAPI.synchronizeGalleries(urlname, propertyTable)
         catalog:withWriteAccessDo('Deleting Published Collection Set', function()
 	  lrCollectionSet:delete()
 	end)
+	deleteCount = deleteCount + 1
 	lrCollectionSet = nil
       end
 
@@ -669,18 +688,21 @@ function PhotoDeckAPI.synchronizeGalleries(urlname, propertyTable)
           catalog:withWriteAccessDo('Deleting Published Collection', function()
 	    lrCollection:delete()
 	  end)
+	  deleteCount = deleteCount + 1
 	  lrCollection = nil
 	elseif shouldBeACollection then
           logger:trace(string.format("SYNC: PhotoDeck gallery %s '%s' is connected to LightRoom Published Collection Set %i AND to LightRoom Published Collection %i, but it should be Publish Collection. Deleting Published Collection Set.", uuid, gallery.name, lrCollectionSet.localIdentifier, lrCollection.localIdentifier))
           catalog:withWriteAccessDo('Deleting Published Collection Set', function()
 	    lrCollectionSet:delete()
 	  end)
+	  deleteCount = deleteCount + 1
 	  lrCollectionSet = nil
         else
           logger:trace(string.format("SYNC: PhotoDeck gallery %s '%s' is connected to LightRoom Published Collection Set %i AND to LightRoom Published Collection %i, and we don't know yet what it should be. Assuming Published Collection, and deleting Published Collection Set.", uuid, gallery.name, lrCollectionSet.localIdentifier, lrCollection.localIdentifier))
           catalog:withWriteAccessDo('Deleting Published Collection', function()
 	    lrCollection:delete()
 	  end)
+	  deleteCount = deleteCount + 1
 	  lrCollectionSet = nil
 	end
       end
@@ -720,8 +742,10 @@ function PhotoDeckAPI.synchronizeGalleries(urlname, propertyTable)
               lrCollectionSet:setRemoteId(uuid)
               lrCollectionSet:setRemoteUrl(gallery.fullurl)
 	    end)
+	    createCount = createCount + 1
 	  else
             logger:trace(string.format("SYNC ERROR: PhotoDeck gallery %s '%s' NOT found in LightRoom, and failed to create Published Collection Set.", uuid, collectionName))
+	    errorsCount = errorsCount + 1
           end
         elseif shouldBeACollection then
           logger:trace(string.format("SYNC: PhotoDeck gallery %s '%s' NOT found in LightRoom. Creating Published Collection.", uuid, collectionName))
@@ -733,8 +757,10 @@ function PhotoDeckAPI.synchronizeGalleries(urlname, propertyTable)
               lrCollection:setRemoteId(uuid)
               lrCollection:setRemoteUrl(gallery.fullurl)
 	    end)
+	    createCount = createCount + 1
 	  else
             logger:trace(string.format("SYNC ERROR: PhotoDeck gallery %s '%s' NOT found in LightRoom, and failed to create Published Collection.", uuid, collectionName))
+	    errorsCount = errorsCount + 1
 	  end
 	else
           logger:trace(string.format("SYNC: PhotoDeck gallery %s '%s' NOT found in LightRoom. Creating Published Collection by default.", uuid, collectionName))
@@ -746,8 +772,10 @@ function PhotoDeckAPI.synchronizeGalleries(urlname, propertyTable)
               lrCollection:setRemoteId(uuid)
               lrCollection:setRemoteUrl(gallery.fullurl)
 	    end)
+	    createCount = createCount + 1
 	  else
             logger:trace(string.format("SYNC ERROR: PhotoDeck gallery %s '%s' NOT found in LightRoom, and failed to create Published Collection.", uuid, collectionName))
+	    errorsCount = errorsCount + 1
           end
         end
       end
@@ -762,7 +790,9 @@ function PhotoDeckAPI.synchronizeGalleries(urlname, propertyTable)
 
   synchronizeGallery(1, rootGalleryId, publishService)
 
-  return nil
+  logger:trace(string.format("SYNC: Done, created: %i, deleted: %i, errors: %i", createCount, deleteCount, errorsCount))
+  PhotoDeckAPI.canSynchronize = true
+  return { created = createCount, deleted = deleteCount, errors = errorsCount }
 end
 
 -- getPhoto returns a photo with remote ID uuid, or nil if it does not exist

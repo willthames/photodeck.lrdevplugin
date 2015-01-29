@@ -170,17 +170,33 @@ local function login(propertyTable)
         propertyTable.multipleWebsites = websitesCount > 1
         onWebsiteSelect(propertyTable, nil, propertyTable.websiteChosen)
       end
+
+      -- show synchronization message if in progress
+      if not propertyTable.canSynchronize then
+        propertyTable.synchronizeGalleriesResult = 'In progress...'
+      end
     end
   end, 'PhotoDeckAPI Login')
 end
 
 local function synchronizeGalleries(propertyTable)
-  PhotoDeckAPI.connect(propertyTable.apiKey,
-       propertyTable.apiSecret, propertyTable.username, propertyTable.password)
-  propertyTable.synchronizeGalleriesResult = 'In progress...'
+  propertyTable.synchronizeGalleriesResult = 'Starting...'
+  propertyTable.canSynchronize = false
   LrTasks.startAsyncTask(function()
+    PhotoDeckAPI.connect(propertyTable.apiKey, propertyTable.apiSecret, propertyTable.username, propertyTable.password)
     local result, error_msg = PhotoDeckAPI.synchronizeGalleries(propertyTable.websiteChosen, propertyTable)
-    propertyTable.synchronizeGalleriesResult  = error_msg or "Finished"
+    if error_msg then
+      propertyTable.synchronizeGalleriesResult = error_msg
+    elseif result then
+      if result.created == 0 and result.deleted == 0 and result.errors == 0 then
+        propertyTable.synchronizeGalleriesResult = "Finished, no changes"
+      else
+        propertyTable.synchronizeGalleriesResult = "Finished: " .. string.format("%i created, %i deleted, %i errors", result.created, result.deleted, result.errors)
+      end
+    else
+      propertyTable.synchronizeGalleriesResult = "?"
+    end
+    propertyTable.canSynchronize = true
   end, 'PhotoDeckAPI galleries synchronization')
 end
 
@@ -213,6 +229,8 @@ function publishServiceProvider.startDialog(propertyTable)
   propertyTable.galleryDisplayStyles = {}
   propertyTable.multipleWebsites = false
   propertyTable.websiteName = ''
+  propertyTable.canSynchronize = PhotoDeckAPI.canSynchronize
+  propertyTable.synchronizeGalleriesResult = ''
   if not propertyTable.apiKey or propertyTable.apiKey == ''
     or not propertyTable.apiSecret or propertyTable.apiSecret == '' then
     propertyTable = updateApiKeyAndSecret(propertyTable)
@@ -374,7 +392,7 @@ function publishServiceProvider.sectionsForTopOfDialog( f, propertyTable )
                      synchronizeGalleries(propertyTable)
 		   end
 	end,
-        enabled = LrView.bind 'loggedin'
+	enabled = LrBinding.andAllKeys('loggedin', 'canSynchronize'),
       },
 
       f:static_text {
