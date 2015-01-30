@@ -18,15 +18,18 @@ local map = PhotoDeckUtils.map
 
 local publishServiceProvider = {}
 
--- needed to publish in addition to export
-publishServiceProvider.supportsIncrementalPublish = true
--- exportLocation gets replaced with PhotoDeck specific form section
+-- General plugin configuration for export & publish operations
 publishServiceProvider.hideSections = { 'exportLocation' }
-publishServiceProvider.small_icon = 'photodeck16.png'
+publishServiceProvider.allowFileFormats = { 'JPEG', 'TIFF', 'Original' }
+publishServiceProvider.hidePrintResolution = true
 
+-- General plugin configuration for publish operations
+publishServiceProvider.supportsIncrementalPublish = true
+publishServiceProvider.small_icon = 'photodeck16.png'
 publishServiceProvider.titleForPublishedCollection = "Gallery"
 publishServiceProvider.titleForPublishedCollectionSet = "Folder"
 publishServiceProvider.titleForGoToPublishedCollection = "Go to Gallery"
+publishServiceProvider.titleForGoToPublishedPhoto = "Go to Photo in Gallery"
 publishServiceProvider.disableRenamePublishedCollectionSet = true
 
 -- these fields get stored between uses
@@ -613,9 +616,10 @@ publishServiceProvider.deletePhotosFromPublishedCollection = function( publishSe
   end
 end
 
--- no idea what actual criteria are
 publishServiceProvider.validatePublishedCollectionName = function( proposedName )
-  return string.match(proposedName, '^[%w:/_ -]*$')
+  -- string needs to be valid UTF-8 (3 multibyte chars max) and less than 200 bytes
+  local length = string.len(proposedName)
+  return length > 0 and length < 200
 end
 
 publishServiceProvider.viewForCollectionSettings = function( f, publishSettings, info )
