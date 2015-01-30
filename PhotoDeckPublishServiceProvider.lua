@@ -33,11 +33,10 @@ publishServiceProvider.disableRenamePublishedCollectionSet = true
 publishServiceProvider.exportPresetFields = {
   { key = 'username', default = "" },
   { key = 'password', default = "" },
-  { key = 'fullname', default = "" },
   { key = 'apiKey', default = "" },
   { key = 'apiSecret', default = "" },
   { key = 'websiteChosen', default = "" },
-  { key = 'uploadOnRepublish', default = false },
+  { key = 'uploadOnRepublish', default = false }
 }
 
 local function  updateApiKeyAndSecret(propertyTable)
@@ -152,6 +151,7 @@ local function login(propertyTable)
         propertyTable.loggedin = PhotoDeckAPI.loggedin
       else
         propertyTable.websites = websites
+	propertyTable.websiteChoices = {}
 	local websitesCount = 0
 	local firstWebsite = nil
 	local foundCurrent = false
@@ -251,7 +251,7 @@ end
 
 function publishServiceProvider.sectionsForTopOfDialog( f, propertyTable )
   -- LrMobdebug.on()
-  propertyTable.connectionStatus = 'Not logged in'
+  local isPublish = not not propertyTable.LR_publishService
 
   local apiCredentials =  {
     title = LOC "$$$/PhotoDeck/ExportDialog/Account=PhotoDeck Plugin API keys",
@@ -353,11 +353,13 @@ function publishServiceProvider.sectionsForTopOfDialog( f, propertyTable )
       f:column {
 	f:row {
           f:static_text {
+	    visible = LrBinding.andAllKeys('LR_publishService', 'loggedin'),
             title = "Website:",
             width = LrView.share "user_label_width",
             alignment = 'right'
           },
           f:static_text {
+	    visible = LrBinding.andAllKeys('LR_publishService', 'loggedin'),
             title = LrView.bind 'websiteName',
             width = 300,
           }
@@ -367,6 +369,7 @@ function publishServiceProvider.sectionsForTopOfDialog( f, propertyTable )
       f:column {
         f:push_button {
           title = 'Change',
+	  visible = LrBinding.andAllKeys('LR_publishService', 'loggedin'),
 	  enabled = LrBinding.andAllKeys('loggedin', 'multipleWebsites'),
           action = function() propertyTable = chooseWebsite(propertyTable) end,
         },
@@ -411,11 +414,18 @@ function publishServiceProvider.sectionsForTopOfDialog( f, propertyTable )
     }
   }
 
-  return {
-    apiCredentials,
-    userAccount,
-    publishSettings
-  }
+  if isPublish then
+    return {
+      apiCredentials,
+      userAccount,
+      publishSettings
+    }
+  else
+    return {
+      apiCredentials,
+      userAccount
+    }
+  end
 end
 
 function publishServiceProvider.processRenderedPhotos( functionContext, exportContext )
@@ -423,10 +433,12 @@ function publishServiceProvider.processRenderedPhotos( functionContext, exportCo
 
   local exportSession = exportContext.exportSession
   local exportSettings = assert( exportContext.propertyTable )
+  local isPublish = exportSettings.LR_isExportForPublish
   local nPhotos = exportSession:countRenditions()
-  PhotoDeckAPI.connect(exportSettings.apiKey, exportSettings.apiSecret, exportSettings.username, exportSettings.password)
-
+  local catalog = exportSession.catalog
   local error_msg
+
+  PhotoDeckAPI.connect(exportSettings.apiKey, exportSettings.apiSecret, exportSettings.username, exportSettings.password)
 
   -- Set progress title.
   local progressScope = exportContext:configureProgress {
@@ -435,60 +447,56 @@ function publishServiceProvider.processRenderedPhotos( functionContext, exportCo
     or LOC "$$$/PhotoDeck/Publish/Progress/One=Publishing one photo to PhotoDeck",
   }
 
-  -- Save off uploaded photo IDs so we can take user to those photos later.
-  local uploadedPhotoIds = {}
-  local collectionInfo = exportContext.publishedCollectionInfo
   -- Look for a gallery id for this collection.
-  local galleryId = collectionInfo.remoteId
-  local galleryPhotos
   local urlname = exportSettings.websiteChosen
   local gallery = nil
 
-  if galleryId then
-    gallery, error_msg = PhotoDeckAPI.gallery(urlname, galleryId)
-    if error_msg then
-      progressScope:done()
-      LrErrors.throwUserError("Error retrieving gallery: " .. error_msg)
-      return
+  if isPublish then
+    local collectionInfo = exportContext.publishedCollectionInfo
+    local galleryId = collectionInfo.remoteId
+    local galleryPhotos
+  
+    if galleryId then
+      gallery, error_msg = PhotoDeckAPI.gallery(urlname, galleryId)
+      if error_msg then
+        progressScope:done()
+        LrErrors.throwUserError("Error retrieving gallery: " .. error_msg)
+        return
+      end
     end
-  end
-
-  if not gallery then
-    -- Create or update this gallery.
-    if not collectionInfo.publishedCollection then
-      collectionInfo.publishedCollection = exportContext.publishedCollection
+  
+    if not gallery then
+      -- Create or update this gallery.
+      if not collectionInfo.publishedCollection then
+        collectionInfo.publishedCollection = exportContext.publishedCollection
+      end
+      gallery, error_msg = PhotoDeckAPI.createOrUpdateGallery(urlname, collectionInfo)
+      if error_msg then
+        progressScope:done()
+        LrErrors.throwUserError("Error creating gallery: " .. error_msg)
+        return
+      end
     end
-    gallery, error_msg = PhotoDeckAPI.createOrUpdateGallery(urlname, collectionInfo)
-    if error_msg then
-      progressScope:done()
-      LrErrors.throwUserError("Error creating gallery: " .. error_msg)
-      return
-    end
-  end
-
-  -- gather information for dealing with recordPublishedPhotoUrl bug
-  local catalog = exportSession.catalog
-  local collection = exportContext.publishedCollection
-  local publishedPhotos = collection:getPublishedPhotos()
-  local publishedPhotoById = {}
-  for _, pp in pairs(publishedPhotos) do
-    publishedPhotoById[pp:getPhoto().localIdentifier] = pp
   end
 
   -- Iterate through photo renditions.
+  local uploadedPhotoIds = {}
   for i, rendition in exportContext:renditions { stopIfCanceled = true } do
     -- Update progress scope.
     progressScope:setPortionComplete( ( i - 1 ) / nPhotos )
     -- Get next photo.
     local photo = rendition.photo
+    local photoId = nil
 
     -- See if we previously uploaded this photo.
-    local photoId = rendition.publishedPhotoId or uploadedPhotoIds[photo.localIdentifier]
-    if not photoId then
-      -- previously uploaded in another gallery?
-      catalog:withReadAccessDo( function()
-        photoId = photo:getPropertyForPlugin(_PLUGIN, "photoId")
-      end)
+    if isPublish then
+      photoId = rendition.publishedPhotoId or uploadedPhotoIds[photo.localIdentifier]
+      if not photoId then
+        -- previously published in another gallery?
+        catalog:withReadAccessDo( function()
+          photoId = photo:getPropertyForPlugin(_PLUGIN, "photoId")
+        end)
+      end
     end
 
     if not rendition.wasSkipped then
@@ -511,8 +519,7 @@ function publishServiceProvider.processRenderedPhotos( functionContext, exportCo
 	if not error_msg then
           -- Build list of photo attributes
           local photoAttributes = {}
-          local publishedPhoto = publishedPhotoById[photo.localIdentifier]
-          local needsUpload = not photoAlreadyPublished or exportSettings.uploadOnRepublish
+	  local needsUpload = not photoAlreadyPublished or exportSettings.uploadOnRepublish
   
           if needsUpload then
             photoAttributes.contentPath = pathOrMessage
@@ -529,21 +536,21 @@ function publishServiceProvider.processRenderedPhotos( functionContext, exportCo
         end
 
 	if not error_msg and upload and upload.uuid and upload.uuid ~= "" then
-          --logger:trace(printTable(upload))
+	  if isPublish then
+            rendition:recordPublishedPhotoId(upload.uuid)
+	    if upload.url then
+              rendition:recordPublishedPhotoUrl(upload.url)
+            end
 
-          rendition:recordPublishedPhotoId(upload.uuid)
-	  if upload.url then
-            rendition:recordPublishedPhotoUrl(upload.url)
+	    -- Also save the remote photo ID at the LrPhoto level, so that we can find it when publishing in a different gallery
+	    catalog:withWriteAccessDo( "publish", function( context )
+              photo:setPropertyForPlugin(_PLUGIN, "photoId", upload.uuid)
+            end)
           end
 
 	  -- Remember this in the list of photos we uploaded.
 	  uploadedPhotoIds[photo.localIdentifier] = upload.uuid
 
-
-	  -- Also save the remote photo ID at the LrPhoto level, so that we can find it when publishing in a different gallery
-	  catalog:withWriteAccessDo( "publish", function( context )
-            photo:setPropertyForPlugin(_PLUGIN, "photoId", upload.uuid)
-          end)
 	else
 	  rendition:uploadFailed(error_msg or 'Upload failed')
         end
