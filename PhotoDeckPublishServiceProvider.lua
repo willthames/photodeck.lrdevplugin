@@ -236,15 +236,17 @@ function publishServiceProvider.startDialog(propertyTable)
   propertyTable.websiteName = ''
   propertyTable.canSynchronize = PhotoDeckAPI.canSynchronize
   propertyTable.synchronizeGalleriesResult = ''
-  if not PhotoDeckAPI.hasDistributionKeys and (
-    not propertyTable.apiKey or propertyTable.apiKey == ''
-    or not propertyTable.apiSecret or propertyTable.apiSecret == '') then
+
+  local keysAreValid = PhotoDeckAPI.hasDistributionKeys or (
+    propertyTable.apiKey and propertyTable.apiKey ~= '' and
+    propertyTable.apiSecret and propertyTable.apiSecret ~= '')
+
+  if not keysAreValid then
     propertyTable = updateApiKeyAndSecret(propertyTable)
   end
   if propertyTable.username and propertyTable.username ~= '' and
      propertyTable.password and propertyTable.password ~= '' and
-     propertyTable.apiKey and propertyTable.apiKey ~= '' and
-     propertyTable.apiSecret and propertyTable.apiSecret ~= '' then
+     keysAreValid then
     login(propertyTable)
   else
     ping(propertyTable)
