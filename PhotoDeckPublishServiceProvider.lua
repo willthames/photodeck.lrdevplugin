@@ -236,8 +236,9 @@ function publishServiceProvider.startDialog(propertyTable)
   propertyTable.websiteName = ''
   propertyTable.canSynchronize = PhotoDeckAPI.canSynchronize
   propertyTable.synchronizeGalleriesResult = ''
-  if not propertyTable.apiKey or propertyTable.apiKey == ''
-    or not propertyTable.apiSecret or propertyTable.apiSecret == '' then
+  if not PhotoDeckAPI.hasDistributionKeys and (
+    not propertyTable.apiKey or propertyTable.apiKey == ''
+    or not propertyTable.apiSecret or propertyTable.apiSecret == '') then
     propertyTable = updateApiKeyAndSecret(propertyTable)
   end
   if propertyTable.username and propertyTable.username ~= '' and
@@ -421,18 +422,15 @@ function publishServiceProvider.sectionsForTopOfDialog( f, propertyTable )
     }
   }
 
-  if isPublish then
-    return {
-      apiCredentials,
-      userAccount,
-      publishSettings
-    }
-  else
-    return {
-      apiCredentials,
-      userAccount
-    }
+  local dialogs = {}
+  if not PhotoDeckAPI.hasDistributionKeys then
+    table.insert(dialogs, apiCredentials)
   end
+  table.insert(dialogs, userAccount);
+  if isPublish then
+    table.insert(dialogs, publishSettings);
+  end
+  return dialogs
 end
 
 function publishServiceProvider.processRenderedPhotos( functionContext, exportContext )

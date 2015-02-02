@@ -11,10 +11,15 @@ local logger = import 'LrLogger'( 'PhotoDeckPublishLightroomPlugin' )
 logger:enable('logfile')
 
 local urlprefix = 'http://api.photodeck.com'
+
+local PhotoDeckAPI_KEY = ''
+local PhotoDeckAPI_SECRET = ''
+
 local isTable = PhotoDeckUtils.isTable
 local printTable = PhotoDeckUtils.printTable
 
 local PhotoDeckAPI = {
+  hasDistributionKeys = PhotoDeckAPI_KEY and PhotoDeckAPI_KEY ~= '',
   key = '',
   secret = '',
   password = '',
@@ -207,8 +212,15 @@ function PhotoDeckAPI.requestMultiPart(method, uri, content, onerror)
 end
 
 function PhotoDeckAPI.connect(key, secret, username, password)
-  PhotoDeckAPI.key = key
-  PhotoDeckAPI.secret = secret
+  if PhotoDeckAPI.hasDistributionKeys then
+    -- use builtin keys
+    PhotoDeckAPI.key = PhotoDeckAPI_KEY
+    PhotoDeckAPI.secret = PhotoDeckAPI_SECRET
+  else
+    -- use the one supplied by the user
+    PhotoDeckAPI.key = key
+    PhotoDeckAPI.secret = secret
+  end
 
   if PhotoDeckAPI.loggedin and PhotoDeckAPI.username ~= username then
     PhotoDeckAPI.logout()
