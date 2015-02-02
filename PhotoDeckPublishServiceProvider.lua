@@ -626,6 +626,27 @@ publishServiceProvider.validatePublishedCollectionName = function( proposedName 
   return length > 0 and length < 200
 end
 
+publishServiceProvider.metadataThatTriggersRepublish = function( publishSettings )
+  return {
+    default = false,
+    rating = true,
+    title = true,
+    caption = true,
+    creator = true,
+    keywords = true,
+    dateCreated = true,
+    headline = true,
+    iptcSubjectCode = true,
+    dateCreated = true,
+    location = true,
+    city = true,
+    stateProvince = true,
+    country = true,
+    copyright = true,
+    customMetadata = false
+  }
+end
+
 publishServiceProvider.viewForCollectionSettings = function( f, publishSettings, info )
   info.collectionSettings:addObserver('display_style', onGalleryDisplayStyleSelect)
   getGalleryDisplayStyles(publishSettings, info.collectionSettings)
