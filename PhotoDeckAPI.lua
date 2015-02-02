@@ -105,14 +105,14 @@ local function handle_response(seq, response, resp_headers, onerror)
     else
       -- Generic HTTP error
       if status_code == "999" then
-        error_msg = "Unknwon error"
+        error_msg = LOC("$$$/PhotoDeck/API/UnknownError=Unknwon error")
       else
-        error_msg = "HTTP error " .. status_code
+        error_msg = LOC("$$$/PhotoDeck/API/HTTPError=HTTP error ^1", status_code)
       end
     end
 
     if not response and status_code == "999" then
-      error_msg = "No response from network"
+      error_msg = LOC("$$$/PhotoDeck/API/NoResponse=No response from network")
     end
 
     local error_msg_from_xml = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.error)
@@ -261,7 +261,7 @@ function PhotoDeckAPI.websites()
         for _ in pairs(result) do websites_count = websites_count + 1 end
       end
       if websites_count == 0 then
-        error_msg = "No websites found"
+	error_msg = LOC("$$$/PhotoDeck/API/Websites/NotFound=No websites found")
       end
     end
     if error_msg then
@@ -280,7 +280,7 @@ function PhotoDeckAPI.website(urlname)
   if not error_msg then
     website = websites[urlname]
     if not website then 
-      error_msg = "Website not found"
+      error_msg = LOC("$$$/PhotoDeck/API/Website/NotFound=Website not found")
     end
   end
   return website, error_msg
@@ -384,7 +384,7 @@ function PhotoDeckAPI.createOrUpdateGallery(urlname, collectionInfo, updateSetti
     -- Start from the root gallery
     parentGalleryId = website.rootgalleryuuid
     if not parentGalleryId or parentGalleryId == "" then
-      return nil, "Couldn't find root gallery"
+      return nil, LOC("$$$/PhotoDeck/API/Galleries/RootNotFound=Couldn't find PhotoDeck root gallery")
     end
 
     -- Now iterate over each parent, starting from the top level
@@ -406,7 +406,7 @@ function PhotoDeckAPI.createOrUpdateGallery(urlname, collectionInfo, updateSetti
           if subgallery.name == parent.name then
 	    parentGallery, error_msg = PhotoDeckAPI.gallery(urlname, uuid)
 	    if error_msg or not parentGallery then
-              return nil, error_msg or "Couldn't get subgallery"
+              return nil, error_msg or LOC("$$$/PhotoDeck/API/Gallery/SubGalleryNotFound=Couldn't get subgallery")
             end
 	    break
           end
@@ -446,7 +446,7 @@ function PhotoDeckAPI.createOrUpdateGallery(urlname, collectionInfo, updateSetti
         if subgallery.name == collectionInfo.name then
   	  gallery, error_msg = PhotoDeckAPI.gallery(urlname, uuid)
           if error_msg or not gallery then
-            return nil, error_msg or "Couldn't get subgallery"
+            return nil, error_msg or LOC("$$$/PhotoDeck/API/Gallery/SubGalleryNotFound=Couldn't get subgallery")
           end
   	  break
         end
@@ -511,7 +511,7 @@ function PhotoDeckAPI.synchronizeGalleries(urlname, propertyTable)
   local catalog = publishService.catalog
 
   if not PhotoDeckAPI.canSynchronize then
-    return nil, "Task already in progress"
+    return nil, LOC("$$$/PhotoDeck/SynchronizeStatus/AlreadyInProgress=Task already in progress")
   end
   PhotoDeckAPI.canSynchronize = false
 
@@ -519,7 +519,7 @@ function PhotoDeckAPI.synchronizeGalleries(urlname, propertyTable)
   local deleteCount = 0
   local errorsCount = 0
 
-  propertyTable.synchronizeGalleriesResult = 'Connecting to PhotoDeck website...'
+  propertyTable.synchronizeGalleriesResult = LOC("$$$/PhotoDeck/SynchronizeStatus/Connecting=Connecting to PhotoDeck website...")
   local website = PhotoDeckAPI.website(urlname)
   local rootGalleryId = nil
   if website then
@@ -528,15 +528,15 @@ function PhotoDeckAPI.synchronizeGalleries(urlname, propertyTable)
 
   if not rootGalleryId then
     PhotoDeckAPI.canSynchronize = true
-    return nil, "Couldn't find PhotoDeck root gallery"
+    return nil, LOC("$$$/PhotoDeck/API/Galleries/RootNotFound=Couldn't find PhotoDeck root gallery")
   end
 
-  propertyTable.synchronizeGalleriesResult = 'Reading PhotoDeck gallery structure...'
+  propertyTable.synchronizeGalleriesResult = LOC("$$$/PhotoDeck/SynchronizeStatus/ReadingStructure=Reading PhotoDeck gallery structure...")
   local photodeckGalleries, error_msg = PhotoDeckAPI.galleries(urlname)
 
   if not photodeckGalleries or error_msg then
     PhotoDeckAPI.canSynchronize = true
-    return nil, error_msg or "Couldn't get PhotoDeck gallery structure"
+    return nil, error_msg or LOC("$$$/PhotoDeck/SynchronizeStatus/ErrorReadingStructure=Couldn't get PhotoDeck gallery structure")
   end
 
   local photodeckGalleriesByParent = {}
@@ -554,7 +554,7 @@ function PhotoDeckAPI.synchronizeGalleries(urlname, propertyTable)
   local synchronizeGallery
   synchronizeGallery = function(depth, parentPDGalleryUUID, parentLRCollectionSet)
     local parentPDGallery = photodeckGalleries[parentPDGalleryUUID]
-    propertyTable.synchronizeGalleriesResult = "Synchronizing '" .. parentPDGallery.name .. "'..."
+    propertyTable.synchronizeGalleriesResult = LOC("$$$/PhotoDeck/SynchronizeStatus/Synchronizing=Synchronizing '^1'...", parentPDGallery.name)
     logger:trace(string.format("SYNC: Exploring PhotoDeck galleries under %s '%s' at depth %i", parentPDGalleryUUID, parentPDGallery.name, depth))
     local pdGalleries = photodeckGalleriesByParent[parentPDGalleryUUID] or {}
     local lrCollectionSets = parentLRCollectionSet:getChildCollectionSets()
@@ -814,7 +814,7 @@ function PhotoDeckAPI.photosInGallery(urlname, galleryId)
   local medias = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.photosInGallery)
   
   if not medias and not error_msg then
-    error_msg = "Couldn't get photos in gallery"
+    error_msg = LOC("$$$/PhotoDeck/API/Gallery/ErrorGettingPhotos=Couldn't get photos in gallery")
   end
 
   if not error_msg then
@@ -849,7 +849,7 @@ function PhotoDeckAPI.subGalleriesInGallery(urlname, galleryId)
     --logger:trace("PhotoDeckAPI.subGalleriesInGallery " .. tostring(page) .. "/" .. tostring(totalPages) .. ": " .. printTable(galleries))
   
     if not galleries and not error_msg then
-      error_msg = "Couldn't get subgalleries"
+      error_msg = LOC("$$$/PhotoDeck/API/Gallery/ErrorGettingSubgalleries=Couldn't get sub galleries in gallery")
     end
 
     if not error_msg then
@@ -908,7 +908,7 @@ function PhotoDeckAPI.uploadPhoto(urlname, attributes)
   local response, error_msg = PhotoDeckAPI.requestMultiPart('POST', url, content)
   local media = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.uploadPhoto)
   if not media and not error_msg then
-    error_msg = "Photo upload failed"
+    error_msg = LOC("$$$/PhotoDeck/API/Media/UploadFailed=Upload failed")
   end
   if not error_msg and attributes.publishToGallery then
     local website = PhotoDeckAPI.website(urlname)
@@ -940,7 +940,7 @@ function PhotoDeckAPI.updatePhoto(photoId, urlname, attributes)
   local response, error_msg = PhotoDeckAPI.requestMultiPart('PUT', url, content)
   local media = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.updatePhoto)
   if not media and not error_msg then
-    error_msg = "Photo update failed"
+    error_msg = LOC("$$$/PhotoDeck/API/Media/UpdateFailed=Update failed")
   end
   if not error_msg and attributes.publishToGallery then
     local website = PhotoDeckAPI.website(urlname)
@@ -985,7 +985,7 @@ function PhotoDeckAPI.galleryDisplayStyles(urlname)
         for _ in pairs(result) do styles_count = styles_count + 1 end
       end
       if styles_count == 0 then
-        error_msg = "Couldn't get list of gallery display styles"
+	error_msg = LOC("$$$/PhotoDeck/API/GalleryDisplayStyles/Empty=Couldn't get list of gallery display styles")
       end
     end
     if not error_msg then

@@ -26,10 +26,10 @@ publishServiceProvider.hidePrintResolution = true
 -- General plugin configuration for publish operations
 publishServiceProvider.supportsIncrementalPublish = true
 publishServiceProvider.small_icon = 'photodeck16.png'
-publishServiceProvider.titleForPublishedCollection = "Gallery"
-publishServiceProvider.titleForPublishedCollectionSet = "Folder"
-publishServiceProvider.titleForGoToPublishedCollection = "Go to Gallery"
-publishServiceProvider.titleForGoToPublishedPhoto = "Go to Photo in Gallery"
+publishServiceProvider.titleForPublishedCollection = LOC("$$$/PhotoDeck/Publish/Collection=Gallery")
+publishServiceProvider.titleForPublishedCollectionSet = LOC("$$$/PhotoDeck/Publish/CollectionSet=Folder")
+publishServiceProvider.titleForGoToPublishedCollection = LOC("$$$/PhotoDeck/Publish/GoToCollection=Go to PhotoDeck Gallery")
+publishServiceProvider.titleForGoToPublishedPhoto =  LOC("$$$/PhotoDeck/Publish/GoToPhoto=Go to Photo in PhotoDeck Gallery")
 publishServiceProvider.disableRenamePublishedCollectionSet = true
 
 -- these fields get stored between uses
@@ -49,7 +49,7 @@ local function  updateApiKeyAndSecret(propertyTable)
     spacing = f:dialog_spacing(),
     f:row {
       f:static_text {
-        title = "API Key",
+        title = LOC "$$$/PhotoDeck/ApiKeyDialog/ApiKey=API Key:",
         width = LrView.share "label_width",
         alignment = "right",
       },
@@ -61,7 +61,7 @@ local function  updateApiKeyAndSecret(propertyTable)
     },
     f:row {
       f:static_text {
-        title = "API Secret",
+        title = LOC "$$$/PhotoDeck/ApiKeyDialog/ApiSecret=API Secret:",
         width = LrView.share "label_width",
         alignment = "right",
       },
@@ -73,7 +73,7 @@ local function  updateApiKeyAndSecret(propertyTable)
     },
   }
   local result = LrDialogs.presentModalDialog({
-    title = LOC "$$$/PhotoDeck/APIKeys=PhotoDeck API Keys",
+    title = LOC "$$$/PhotoDeck/ApiKeyDialog/Title=PhotoDeck API Keys",
     contents = c,
   })
   return propertyTable
@@ -90,7 +90,7 @@ local function chooseWebsite(propertyTable)
     },
   }
   local result = LrDialogs.presentModalDialog({
-    title = LOC "$$$/PhotoDeck/WebsiteChoice=PhotoDeck Websites",
+    title = LOC "$$$/PhotoDeck/WebsitesDialog/Title=PhotoDeck Websites",
     contents = c,
   })
   return propertyTable
@@ -111,38 +111,38 @@ local function chooseGalleryDisplayStyle(propertyTable, collectionInfo)
     },
   }
   local result = LrDialogs.presentModalDialog({
-    title = LOC "$$$/PhotoDeck/GalleryDisplayStyle=Gallery Display Style",
+    title = LOC "$$$/PhotoDeck/GalleryDisplayStylesDialog/Title=Gallery Display Styles",
     contents = c,
   })
   return propertyTable
 end
 
 local function ping(propertyTable)
-  propertyTable.connectionStatus = 'Connecting to PhotoDeck...'
+  propertyTable.connectionStatus = LOC "$$$/PhotoDeck/ConnectionStatus/Connecting=Connecting to PhotoDeck^."
   LrTasks.startAsyncTask(function()
     PhotoDeckAPI.connect(propertyTable.apiKey, propertyTable.apiSecret, propertyTable.username, propertyTable.password)
     local ping, error_msg = PhotoDeckAPI.ping()
     if error_msg then
-      propertyTable.connectionStatus = "Connection failed: " .. error_msg
+      propertyTable.connectionStatus = LOC("$$$/PhotoDeck/ConnectionStatus/Failed=Connection failed: ^1", error_msg)
     elseif propertyTable.loggedin then
-      propertyTable.connectionStatus = "Connected"
+      propertyTable.connectionStatus = LOC "$$$/PhotoDeck/ConnectionStatus/Connected=Connected"
     else
-      propertyTable.connectionStatus = "Connected, please log in"
+      propertyTable.connectionStatus = LOC "$$$/PhotoDeck/ConnectionStatus/ConnectedPleaseLogin=Connected, please log in"
     end
   end, 'PhotoDeckAPI Ping')
 end
 
 local function login(propertyTable)
-  propertyTable.connectionStatus = 'Logging in...'
+  propertyTable.connectionStatus = LOC "$$$/PhotoDeck/ConnectionStatus/LoggingIn=Logging in^."
   LrTasks.startAsyncTask(function()
     PhotoDeckAPI.connect(propertyTable.apiKey, propertyTable.apiSecret, propertyTable.username, propertyTable.password)
     local result, error_msg = PhotoDeckAPI.whoami()
     if error_msg then
       propertyTable.connectionStatus = error_msg
     elseif not PhotoDeckAPI.loggedin then
-      propertyTable.connectionStatus = "Couldn't log in using those credentials"
+      propertyTable.connectionStatus = LOC "$$$/PhotoDeck/ConnectionStatus/CredentialsError=Couldn't log in using those credentials"
     else
-      propertyTable.connectionStatus = 'Logged in as ' .. result.firstname .. ' ' .. result.lastname
+      propertyTable.connectionStatus = LOC("$$$/PhotoDeck/ConnectionStatus/LoggedInAs=Logged in as ^1 ^2", result.firstname, result.lastname)
     end
     propertyTable.loggedin = PhotoDeckAPI.loggedin
     
@@ -150,7 +150,7 @@ local function login(propertyTable)
       -- get available websites
       websites, error_msg = PhotoDeckAPI.websites()
       if error_msg then
-        propertyTable.connectionStatus = "Couldn't get your website: " .. error_msg
+        propertyTable.connectionStatus = LOC("$$$/PhotoDeck/ConnectionStatus/FailedLoadingWebsite=Couldn't get your website: ^1", error_msg)
         propertyTable.loggedin = PhotoDeckAPI.loggedin
       else
         propertyTable.websites = websites
@@ -166,7 +166,7 @@ local function login(propertyTable)
 	  if k == propertyTable.websiteChosen then
 	    foundCurrent = true
 	  end
-          table.insert(propertyTable.websiteChoices, { title = v.title, value = k })
+          table.insert(propertyTable.websiteChoices, { title = v.title .. " (" .. v.hostname .. ")", value = k })
         end
 	if not foundCurrent then
           -- automatically select first website
@@ -178,14 +178,14 @@ local function login(propertyTable)
 
       -- show synchronization message if in progress
       if not propertyTable.canSynchronize then
-        propertyTable.synchronizeGalleriesResult = 'In progress...'
+        propertyTable.synchronizeGalleriesResult = LOC("$$$/PhotoDeck/SynchronizeStatus/InProgress=In progress^.")
       end
     end
   end, 'PhotoDeckAPI Login')
 end
 
 local function synchronizeGalleries(propertyTable)
-  propertyTable.synchronizeGalleriesResult = 'Starting...'
+  propertyTable.synchronizeGalleriesResult = LOC("$$$/PhotoDeck/SynchronizeStatus/Starting=Starting^.")
   propertyTable.canSynchronize = false
   LrTasks.startAsyncTask(function()
     PhotoDeckAPI.connect(propertyTable.apiKey, propertyTable.apiSecret, propertyTable.username, propertyTable.password)
@@ -194,9 +194,9 @@ local function synchronizeGalleries(propertyTable)
       propertyTable.synchronizeGalleriesResult = error_msg
     elseif result then
       if result.created == 0 and result.deleted == 0 and result.errors == 0 then
-        propertyTable.synchronizeGalleriesResult = "Finished, no changes"
+        propertyTable.synchronizeGalleriesResult = LOC("$$$/PhotoDeck/SynchronizeStatus/FinishedWithNoChanges=Finished, no changes")
       else
-        propertyTable.synchronizeGalleriesResult = "Finished: " .. string.format("%i created, %i deleted, %i errors", result.created, result.deleted, result.errors)
+        propertyTable.synchronizeGalleriesResult = LOC("$$$/PhotoDeck/SynchronizeStatus/FinishedWithChanges=Finished: ^1 created, ^2 deleted, ^3 errors", result.created, result.deleted, result.errors)
       end
     else
       propertyTable.synchronizeGalleriesResult = "?"
@@ -257,7 +257,7 @@ function publishServiceProvider.sectionsForTopOfDialog( f, propertyTable )
   local isPublish = not not propertyTable.LR_publishService
 
   local apiCredentials =  {
-    title = LOC "$$$/PhotoDeck/ExportDialog/Account=PhotoDeck Plugin API keys",
+    title = LOC "$$$/PhotoDeck/ApiKeyDialog/Title=PhotoDeck API Keys",
     synopsis = LrView.bind 'connectionStatus',
 
     f:row {
@@ -265,7 +265,7 @@ function publishServiceProvider.sectionsForTopOfDialog( f, propertyTable )
       f:column {
         f:row {
           f:static_text {
-            title = "API Key:",
+            title = LOC "$$$/PhotoDeck/ApiKeyDialog/ApiKey=API Key:",
             width = LrView.share "label_width",
             alignment = 'right'
           },
@@ -276,7 +276,7 @@ function publishServiceProvider.sectionsForTopOfDialog( f, propertyTable )
         },
         f:row {
           f:static_text {
-            title = "API Secret:",
+            title = LOC "$$$/PhotoDeck/ApiKeyDialog/ApiSecret=API Secret:",
             width = LrView.share "label_width",
             alignment = 'right'
           },
@@ -288,14 +288,14 @@ function publishServiceProvider.sectionsForTopOfDialog( f, propertyTable )
       },
       f:column {
         f:push_button {
-          title = 'Change',
+          title = LOC "$$$/PhotoDeck/ApiKeyDialog/ChangeAction=Change",
           action = function() propertyTable = updateApiKeyAndSecret(propertyTable) end,
         },
       },
     },
   }
   local userAccount = {
-    title = LOC "$$$/PhotoDeck/ExportDialog/Account=PhotoDeck Account",
+    title = LOC "$$$/PhotoDeck/AccountDialog/Title=PhotoDeck Account",
     synopsis = LrView.bind 'connectionStatus',
 
     f:row {
@@ -303,7 +303,7 @@ function publishServiceProvider.sectionsForTopOfDialog( f, propertyTable )
       f:column {
         f:row {
           f:static_text {
-            title = "Username:",
+            title = LOC "$$$/PhotoDeck/AccountDialog/Email=Email:",
             width = LrView.share "user_label_width",
             alignment = 'right'
           },
@@ -314,7 +314,7 @@ function publishServiceProvider.sectionsForTopOfDialog( f, propertyTable )
         },
         f:row {
           f:static_text {
-            title = "Password:",
+            title = LOC "$$$/PhotoDeck/AccountDialog/Password=Password:",
             width = LrView.share "user_label_width",
             alignment = 'right'
           },
@@ -327,7 +327,7 @@ function publishServiceProvider.sectionsForTopOfDialog( f, propertyTable )
 
       f:column {
         f:push_button {
-          title = 'Login',
+          title = LOC "$$$/PhotoDeck/AccountDialog/LoginAction=Login",
           enabled = LrBinding.negativeOfKey('loggedin'),
           action = function () login(propertyTable) end
         },
@@ -357,7 +357,7 @@ function publishServiceProvider.sectionsForTopOfDialog( f, propertyTable )
 	f:row {
           f:static_text {
 	    visible = LrBinding.andAllKeys('LR_publishService', 'loggedin'),
-            title = "Website:",
+            title = LOC "$$$/PhotoDeck/AccountDialog/Website=Website:",
             width = LrView.share "user_label_width",
             alignment = 'right'
           },
@@ -371,7 +371,7 @@ function publishServiceProvider.sectionsForTopOfDialog( f, propertyTable )
 
       f:column {
         f:push_button {
-          title = 'Change',
+          title = LOC "$$$/PhotoDeck/AccountDialog/WebsiteChangeAction=Change",
 	  visible = LrBinding.andAllKeys('LR_publishService', 'loggedin'),
 	  enabled = LrBinding.andAllKeys('loggedin', 'multipleWebsites'),
           action = function() propertyTable = chooseWebsite(propertyTable) end,
@@ -380,26 +380,30 @@ function publishServiceProvider.sectionsForTopOfDialog( f, propertyTable )
     }
   }
   local publishSettings = {
-    title = LOC "$$$/PhotoDeck/ExportDialog/Account=PhotoDeck Publish options",
+    title = LOC "$$$/PhotoDeck/PublishOptionsDialog/Title=PhotoDeck Publish options",
 
     f:row {
       bind_to_object = propertyTable,
 
       f:checkbox {
-        title = 'Re-upload photo when re-publishing',
+        title = LOC "$$$/PhotoDeck/PublishOptionsDialog/UploadOnRepublish=Re-upload photo when re-publishing",
         value = LrView.bind 'uploadOnRepublish'
       }
     },
 
     f:row {
       f:push_button {
-        title = 'Import existing PhotoDeck galleries',
+        title = LOC "$$$/PhotoDeck/PublishOptionsDialog/SynchronizeGalleriesAction=Import existing PhotoDeck galleries",
         action = function()
                    if not propertyTable.LR_publishService then
 		     -- publish service is not created yet (this is a new unsaved plugin instance)
-		     LrDialogs.message('Please save the settings first!')
+		     LrDialogs.message(LOC "$$$/PhotoDeck/PublishOptionsDialog/SaveFirst=Please save the settings first!")
 	           else
-		     local result = LrDialogs.confirm("This will import and connect your existing PhotoDeck galleries structure in LightRoom.", "Galleries that are already connected won't be touched.\nGallery content is currently not imported.", "Proceed", "Cancel")
+		     local result = LrDialogs.confirm(
+		       LOC "$$$/PhotoDeck/PublishOptionsDialog/ConfirmTitle=This will import and connect your existing PhotoDeck galleries structure in LightRoom.",
+		       LOC "$$$/PhotoDeck/PublishOptionsDialog/ConfirmSubtitle=Galleries that are already connected won't be touched.^nGallery content is currently not imported.",
+		       LOC "$$$/PhotoDeck/PublishOptionsDialog/ProceedAction=Proceed",
+		       LOC "$$$/PhotoDeck/PublishOptionsDialog/CancelAction=Cancel")
 		     if result == "ok" then
                        synchronizeGalleries(propertyTable)
 		     end
@@ -446,8 +450,8 @@ function publishServiceProvider.processRenderedPhotos( functionContext, exportCo
   -- Set progress title.
   local progressScope = exportContext:configureProgress {
     title = nPhotos > 1
-    and LOC( "$$$/PhotoDeck/Publish/Progress=Publishing ^1 photos to PhotoDeck", nPhotos )
-    or LOC "$$$/PhotoDeck/Publish/Progress/One=Publishing one photo to PhotoDeck",
+    and LOC("$$$/PhotoDeck/ProcessRenderedPhotos/Progress=Publishing ^1 photos to PhotoDeck", nPhotos)
+    or LOC "$$$/PhotoDeck/ProcessRenderedPhotos/Progress/One=Publishing one photo to PhotoDeck",
   }
 
   -- Look for a gallery id for this collection.
@@ -463,7 +467,7 @@ function publishServiceProvider.processRenderedPhotos( functionContext, exportCo
       gallery, error_msg = PhotoDeckAPI.gallery(urlname, galleryId)
       if error_msg then
         progressScope:done()
-        LrErrors.throwUserError("Error retrieving gallery: " .. error_msg)
+        LrErrors.throwUserError(LOC("$$$/PhotoDeck/ProcessRenderedPhotos/ErrorGettingGallery=Error retrieving gallery: ^1", error_msg))
         return
       end
     end
@@ -476,7 +480,7 @@ function publishServiceProvider.processRenderedPhotos( functionContext, exportCo
       gallery, error_msg = PhotoDeckAPI.createOrUpdateGallery(urlname, collectionInfo)
       if error_msg then
         progressScope:done()
-        LrErrors.throwUserError("Error creating gallery: " .. error_msg)
+        LrErrors.throwUserError(LOC("$$$/PhotoDeck/ProcessRenderedPhotos/ErrorCreatingGallery=Error creating gallery: ^1", error_msg))
         return
       end
     end
@@ -555,7 +559,7 @@ function publishServiceProvider.processRenderedPhotos( functionContext, exportCo
 	  uploadedPhotoIds[photo.localIdentifier] = upload.uuid
 
 	else
-	  rendition:uploadFailed(error_msg or 'Upload failed')
+	  rendition:uploadFailed(error_msg or LOC("$$$/PhotoDeck/ProcessRenderedPhotos/ErrorUploading=Upload failed"))
         end
 
         -- When done with photo, delete temp file. There is a cleanup step that happens later,
@@ -598,14 +602,14 @@ publishServiceProvider.deletePhotosFromPublishedCollection = function( publishSe
         result, error_msg = PhotoDeckAPI.deletePhoto(photoId)
   
         if error_msg then
-          LrErrors.throwUserError("Error deleting photo: " .. error_msg)
+          LrErrors.throwUserError(LOC("$$$/PhotoDeck/DeletePhotos/ErrorDeletingPhoto=Error deleting photo: ^1", error_msg))
         end
       else
         -- otherwise unpublish from the passed in collection
         result, error_msg = PhotoDeckAPI.unpublishPhoto(photoId, galleryId)
   
         if error_msg then
-          LrErrors.throwUserError("Error unpublishing photo: " .. error_msg)
+          LrErrors.throwUserError(LOC("$$$/PhotoDeck/DeletePhotos/ErrorUnpublishingPhoto=Error unpublishing photo: ^1", error_msg))
         end
       end
     end
@@ -631,7 +635,7 @@ publishServiceProvider.viewForCollectionSettings = function( f, publishSettings,
 
     f:row {
       f:static_text {
-        title = "Name:",
+        title = LOC("$$$/PhotoDeck/CollectionSettingsDialog/Name=Name:"),
         width = LrView.share "collectionset_labelwidth",
       },
       f:static_text {
@@ -640,7 +644,7 @@ publishServiceProvider.viewForCollectionSettings = function( f, publishSettings,
     },
     f:row {
       f:static_text {
-        title = "Description:",
+        title = LOC("$$$/PhotoDeck/CollectionSettingsDialog/Description=Description:"),
         width = LrView.share "collectionset_labelwidth",
       },
       f:edit_field {
@@ -652,7 +656,7 @@ publishServiceProvider.viewForCollectionSettings = function( f, publishSettings,
     },
     f:row {
       f:static_text {
-        title = "Gallery Style:",
+        title = LOC("$$$/PhotoDeck/CollectionSettingsDialog/GalleryDisplayStyle=Gallery Style:"),
         width = LrView.share "collectionset_labelwidth",
       },
       f:static_text {
@@ -664,7 +668,7 @@ publishServiceProvider.viewForCollectionSettings = function( f, publishSettings,
         bind_to_object = info.collectionSettings,
         action = function() chooseGalleryDisplayStyle(publishSettings, info.collectionSettings) end,
         enabled = LrBinding.keyIsNotNil 'galleryDisplayStyles',
-        title = "Choose Gallery Style",
+        title = LOC("$$$/PhotoDeck/CollectionSettingsDialog/ChooseGalleryDisplayStyleAction=Choose Gallery Style"),
       }
     }
   }
@@ -677,7 +681,7 @@ publishServiceProvider.updateCollectionSettings = function( publishSettings, inf
   local urlname = publishSettings.websiteChosen
   local result, error_msg = PhotoDeckAPI.createOrUpdateGallery(urlname, info, true)
   if error_msg then
-    LrErrors.throwUserError("Error updating gallery: " .. error_msg)
+    LrErrors.throwUserError(LOC("$$$/PhotoDeck/UpdateCollection/ErrorUpdatingGallery=Error updating gallery: ^1", error_msg))
   end
 end
 
@@ -687,7 +691,7 @@ publishServiceProvider.updateCollectionSetSettings = function( publishSettings, 
   local urlname = publishSettings.websiteChosen
   local result, error_msg = PhotoDeckAPI.createOrUpdateGallery(urlname, info, true)
   if error_msg then
-    LrErrors.throwUserError("Error updating gallery: " .. error_msg)
+    LrErrors.throwUserError(LOC("$$$/PhotoDeck/UpdateCollection/ErrorUpdatingGallery=Error updating gallery: ^1", error_msg))
   end
 end
 
@@ -697,7 +701,7 @@ publishServiceProvider.renamePublishedCollection = function( publishSettings, in
   local urlname = publishSettings.websiteChosen
   local result, error_msg = PhotoDeckAPI.createOrUpdateGallery(urlname, info)
   if error_msg then
-    LrErrors.throwUserError("Error renaming gallery: " .. error_msg)
+    LrErrors.throwUserError(LOC("$$$/PhotoDeck/UpdateCollection/ErrorRenamingGallery=Error renaming gallery: ^1", error_msg))
   end
 end
 
@@ -707,7 +711,7 @@ publishServiceProvider.reparentPublishedCollection = function( publishSettings, 
   local urlname = publishSettings.websiteChosen
   local result, error_msg = PhotoDeckAPI.createOrUpdateGallery(urlname, info)
   if error_msg then
-    LrErrors.throwUserError("Error reparenting gallery: " .. error_msg)
+    LrErrors.throwUserError(LOC("$$$/PhotoDeck/UpdateCollection/ErrorReparentingGallery=Error reparenting gallery: ^1", error_msg))
   end
 end
 
@@ -718,7 +722,7 @@ publishServiceProvider.deletePublishedCollection = function( publishSettings, in
   local galleryId = info.remoteId
   local result, error_msg = PhotoDeckAPI.deleteGallery(urlname, galleryId)
   if error_msg then
-    LrErrors.throwUserError("Error deleting gallery: " .. error_msg)
+    LrErrors.throwUserError(LOC("$$$/PhotoDeck/DeleteCollection/ErrorDeletingGallery=Error deleting gallery: ^1", error_msg))
   end
 end
 
