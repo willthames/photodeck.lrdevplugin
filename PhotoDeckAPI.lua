@@ -572,6 +572,10 @@ function PhotoDeckAPI.synchronizeGalleries(urlname, propertyTable)
     local lrCollectionSets = parentLRCollectionSet:getChildCollectionSets()
     local lrCollections = parentLRCollectionSet:getChildCollections()
     
+    for uuid, gallery in pairs(pdGalleries) do
+      gallery.fullurl = website.homeurl .. '/-/' .. gallery.fullurlpath
+    end
+
     -- Scan Lightroom published collections, and connect them to PhotoDeck galleries
     local lrCollectionsByRemoteId = {}
     for _, lrc in pairs(lrCollections) do
@@ -722,9 +726,19 @@ function PhotoDeckAPI.synchronizeGalleries(urlname, propertyTable)
       if lrCollectionSet then
 	-- Already properly connected, good
         logger:trace(string.format("SYNC: PhotoDeck gallery %s '%s' already connected to Lightroom Published Collection Set %i. Doing nothing.", uuid, gallery.name, lrCollectionSet.localIdentifier))
+	if lrCollectionSet:getRemoteUrl() ~= gallery.fullurl then
+          catalog:withWriteAccessDo('Set Remote Url', function()
+	    lrCollectionSet:setRemoteUrl(gallery.fullurl)
+          end)
+        end
       elseif lrCollection then
 	-- Already properly connected, good
         logger:trace(string.format("SYNC: PhotoDeck gallery %s '%s' already connected to Lightroom Published Collection %i. Doing nothing.", uuid, gallery.name, lrCollection.localIdentifier))
+	if lrCollection:getRemoteUrl() ~= gallery.fullurl then
+          catalog:withWriteAccessDo('Set Remote Url', function()
+	    lrCollection:setRemoteUrl(gallery.fullurl)
+          end)
+        end
       else
 	-- Missing in Lightroom: create
 	local collectionName = gallery.name
