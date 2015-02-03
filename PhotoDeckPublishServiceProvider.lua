@@ -577,19 +577,13 @@ function publishServiceProvider.processRenderedPhotos( functionContext, exportCo
         error_msg = nil
 
         local photoAlreadyPublished = not not photoId
-	if photoAlreadyPublished then
-	  local remotePhoto
-	  remotePhoto, error_msg = PhotoDeckAPI.getPhoto(photoId)
-	  photoAlreadyPublished = not not remotePhoto
-        end
 
 	local upload
 	if not error_msg then
           -- Build list of photo attributes
           local photoAttributes = {}
-	  local needsUpload = not photoAlreadyPublished or exportSettings.uploadOnRepublish
   
-          if needsUpload then
+          if not photoAlreadyPublished or exportSettings.uploadOnRepublish then
             photoAttributes.contentPath = pathOrMessage
           end
           photoAttributes.publishToGallery = gallery
@@ -597,8 +591,15 @@ function publishServiceProvider.processRenderedPhotos( functionContext, exportCo
   
           -- Upload or replace/update the photo.
           if photoAlreadyPublished then
-            upload, error_msg = PhotoDeckAPI.updatePhoto(photoId, urlname, photoAttributes)
-          else
+            upload, error_msg = PhotoDeckAPI.updatePhoto(photoId, urlname, photoAttributes, true)
+	    if upload and upload.notfound then
+	      -- Not found error on PhotoDeck. Assume that the photo is gone and that we need to upload it again.
+	      photoAlreadyPublished = false
+	      photoAttributes.contentPath = pathOrMessage
+	    end
+	  end
+
+          if not photoAlreadyPublished then
             upload, error_msg = PhotoDeckAPI.uploadPhoto(urlname, photoAttributes)
           end
         end

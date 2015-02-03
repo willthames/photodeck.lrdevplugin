@@ -932,9 +932,13 @@ function PhotoDeckAPI.uploadPhoto(urlname, attributes)
   return media, error_msg
 end
 
-function PhotoDeckAPI.updatePhoto(photoId, urlname, attributes)
+function PhotoDeckAPI.updatePhoto(photoId, urlname, attributes, handleNotFound)
   logger:trace(string.format('PhotoDeckAPI.updatePhoto("%s", "%s", <attributes>)', photoId, urlname))
   local url = '/medias/' .. photoId .. '.xml'
+  local onerror = {}
+  if handleNotFound then
+    onerror["404"] = function() return nil, 'Not found' end
+  end
   local content = {}
   if attributes.contentPath then
     table.insert(content, { name = 'media[content]', filePath = attributes.contentPath, fileName = PhotoDeckUtils.basename(attributes.contentPath), contentType = 'image/jpeg' })
@@ -949,7 +953,11 @@ function PhotoDeckAPI.updatePhoto(photoId, urlname, attributes)
     end
   end
   --logger:trace('PhotoDeckAPI.updatePhoto: ' .. printTable(content))
-  local response, error_msg = PhotoDeckAPI.requestMultiPart('PUT', url, content)
+  local response, error_msg = PhotoDeckAPI.requestMultiPart('PUT', url, content, onerror)
+  if handleNotFound and error_msg == 'Not found' then
+    return { notfound = true }, error_msg
+  end
+
   local media = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.updatePhoto)
   if not media and not error_msg then
     error_msg = LOC("$$$/PhotoDeck/API/Media/UpdateFailed=Update failed")
