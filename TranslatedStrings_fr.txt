@@ -17,7 +17,7 @@
 "$$$/PhotoDeck/PublishOptionsDialog/UploadOnRepublish=Réimporter les photos dans PhotoDeck lors de republications"
 "$$$/PhotoDeck/PublishOptionsDialog/SynchronizeGalleriesAction=Importer les galeries PhotoDeck existantes"
 "$$$/PhotoDeck/PublishOptionsDialog/SaveFirst=Merci de commencer par enregistrer les paramètres !"
-"$$$/PhotoDeck/PublishOptionsDialog/ConfirmTitle=Cela va importer et connecter la structure de vos galeries PhotoDeck existantes dans LightRoom."
+"$$$/PhotoDeck/PublishOptionsDialog/ConfirmTitle=Cela va importer et connecter la structure de vos galeries PhotoDeck existantes dans Lightroom."
 "$$$/PhotoDeck/PublishOptionsDialog/ConfirmSubtitle=Les galeries déjà connectées ne seront pas touchées.^nLe contenu des galeries n'est actuellement pas importé."
 "$$$/PhotoDeck/PublishOptionsDialog/ProceedAction=Procéder"
 "$$$/PhotoDeck/PublishOptionsDialog/CancelAction=Annuler"

@@ -403,7 +403,7 @@ function publishServiceProvider.sectionsForTopOfDialog( f, propertyTable )
 		     LrDialogs.message(LOC "$$$/PhotoDeck/PublishOptionsDialog/SaveFirst=Please save the settings first!")
 	           else
 		     local result = LrDialogs.confirm(
-		       LOC "$$$/PhotoDeck/PublishOptionsDialog/ConfirmTitle=This will import and connect your existing PhotoDeck galleries structure in LightRoom.",
+		       LOC "$$$/PhotoDeck/PublishOptionsDialog/ConfirmTitle=This will import and connect your existing PhotoDeck galleries structure in Lightroom.",
 		       LOC "$$$/PhotoDeck/PublishOptionsDialog/ConfirmSubtitle=Galleries that are already connected won't be touched.^nGallery content is currently not imported.",
 		       LOC "$$$/PhotoDeck/PublishOptionsDialog/ProceedAction=Proceed",
 		       LOC "$$$/PhotoDeck/PublishOptionsDialog/CancelAction=Cancel")
