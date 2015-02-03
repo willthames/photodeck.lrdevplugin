@@ -1,4 +1,14 @@
-0.9 - 15/01/2014
+0.10 - 03/02/2015
+-----------------
+Improved robustness and performance
+Lightroom -> PhotoDeck photo metadata synchronization
+Republishing will not reupload image again by default (see plugin settings)
+PhotoDeck galleries structure synchronization
+Plugin can be used in export only mode
+French translations
+Minor fixes
+
+0.9 - 15/01/2015
 ----------------
 Don't replace photos with identical file names at upload
 Fix root gallery discovery when root gallery is not named "Galleries"
