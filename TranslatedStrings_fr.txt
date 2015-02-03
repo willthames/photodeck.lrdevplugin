@@ -46,6 +46,7 @@
 "$$$/PhotoDeck/SynchronizeStatus/Synchronizing=Synchronisation de '^1'^."
 "$$$/PhotoDeck/ProcessRenderedPhotos/Progress=Publication de ^1 photos sur PhotoDeck"
 "$$$/PhotoDeck/ProcessRenderedPhotos/Progress/One=Publication d'une photo sur PhotoDeck"
+"$$$/PhotoDeck/ProcessRenderedPhotos/ErrorGettingWebsite=Erreur lors de la récupération du site web : ^1"
 "$$$/PhotoDeck/ProcessRenderedPhotos/ErrorGettingGallery=Erreur lors de la récupération de la galerie : ^1"
 "$$$/PhotoDeck/ProcessRenderedPhotos/ErrorCreatingGallery=Erreur à la création de la galerie: ^1"
 "$$$/PhotoDeck/ProcessRenderedPhotos/ErrorUploading=Erreur lors de l'import"

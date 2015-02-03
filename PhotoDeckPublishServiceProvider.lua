@@ -435,6 +435,57 @@ function publishServiceProvider.sectionsForTopOfDialog( f, propertyTable )
   return dialogs
 end
 
+local function getPhotoDeckPhotoIdsStoredInCatalog(photo)
+  local str = photo:getPropertyForPlugin(_PLUGIN, "photoId")
+  if not str then
+    return {}
+  end
+
+  local res = {}
+  for elem in string.gmatch(str, "%S+") do
+    local key = nil
+    local val = nil
+    local i = 0
+    local pkv = {}
+    for kv in string.gmatch(elem, '[^:]+') do
+      i = i + 1
+      pkv[i] = kv
+    end
+    if pkv[1] then
+      if pkv[2] then
+	key = pkv[1]
+	val = pkv[2]
+      else
+	key = ''
+	val = pkv[1]
+      end
+    end
+    if key then
+      res[key] = val
+    end
+  end
+
+  for k,v in pairs(res) do
+  end
+
+  return res
+end
+
+local function storePhotoDeckPhotoIdsInCatalog(photo, websiteuuid, photouuid)
+  local curr = getPhotoDeckPhotoIdsStoredInCatalog(photo)
+  curr[websiteuuid] = photouuid
+  local str = ''
+  for k, v in pairs(curr) do
+    if k and k ~= '' then
+      str = str .. tostring(k) .. ':' .. tostring(v) .. ' '
+    else
+      str = str .. tostring(v) .. ' '
+    end
+  end
+  photo:setPropertyForPlugin(_PLUGIN, "photoId", str)
+end
+
+
 function publishServiceProvider.processRenderedPhotos( functionContext, exportContext )
   logger:trace('publishServiceProvider.processRenderedPhotos')
 
@@ -457,8 +508,16 @@ function publishServiceProvider.processRenderedPhotos( functionContext, exportCo
   -- Look for a gallery id for this collection.
   local urlname = exportSettings.websiteChosen
   local gallery = nil
+  local websiteuuid = nil
 
   if isPublish then
+    website, error_msg = PhotoDeckAPI.website(urlname)
+    if not website or error_msg then
+      progressScope:done()
+      LrErrors.throwUserError(LOC("$$$/PhotoDeck/ProcessRenderedPhotos/ErrorGettingWebsite=Error retrieving website: ^1", error_msg))
+      return
+    end
+    websiteuuid = website.uuid
     local collectionInfo = exportContext.publishedCollectionInfo
     local galleryId = collectionInfo.remoteId
     local galleryPhotos
@@ -491,6 +550,7 @@ function publishServiceProvider.processRenderedPhotos( functionContext, exportCo
   for i, rendition in exportContext:renditions { stopIfCanceled = true } do
     -- Update progress scope.
     progressScope:setPortionComplete( ( i - 1 ) / nPhotos )
+
     -- Get next photo.
     local photo = rendition.photo
     local photoId = nil
@@ -501,7 +561,8 @@ function publishServiceProvider.processRenderedPhotos( functionContext, exportCo
       if not photoId then
         -- previously published in another gallery?
         catalog:withReadAccessDo( function()
-          photoId = photo:getPropertyForPlugin(_PLUGIN, "photoId")
+          local photoIds = getPhotoDeckPhotoIdsStoredInCatalog(photo)
+          photoId = photoIds[websiteuuid] or photoIds['']
         end)
       end
     end
@@ -551,7 +612,7 @@ function publishServiceProvider.processRenderedPhotos( functionContext, exportCo
 
 	    -- Also save the remote photo ID at the LrPhoto level, so that we can find it when publishing in a different gallery
 	    catalog:withWriteAccessDo( "publish", function( context )
-              photo:setPropertyForPlugin(_PLUGIN, "photoId", upload.uuid)
+              storePhotoDeckPhotoIdsInCatalog(photo, websiteuuid, upload.uuid)
             end)
           end
 
