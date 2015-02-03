@@ -922,7 +922,7 @@ function PhotoDeckAPI.uploadPhoto(urlname, attributes)
     table.insert(content, { name = 'media[content]', filePath = attributes.contentPath, fileName = PhotoDeckUtils.basename(attributes.contentPath), contentType = 'image/jpeg' })
   end
   if attributes.publishToGallery then
-    table.insert(content, { name = 'media[publish_to_galleries]', value = attributes.publishToGallery.uuid })
+    table.insert(content, { name = 'media[publish_to_galleries]', value = attributes.publishToGallery })
   end
   if attributes.lrPhoto then
     local attributesFromLrPhoto = buildPhotoInfoFromLrPhoto(attributes.lrPhoto)
@@ -935,12 +935,6 @@ function PhotoDeckAPI.uploadPhoto(urlname, attributes)
   local media = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.uploadPhoto)
   if not media and not error_msg then
     error_msg = LOC("$$$/PhotoDeck/API/Media/UploadFailed=Upload failed")
-  end
-  if not error_msg and attributes.publishToGallery then
-    local website = PhotoDeckAPI.website(urlname)
-    if website then
-      media.url = website.homeurl .. '/-/' .. attributes.publishToGallery.fullurlpath .. "/-/medias/" .. media.uuid
-    end
   end
   --logger:trace('PhotoDeckAPI.uploadPhoto: ' .. printTable(media))
   return media, error_msg
@@ -958,7 +952,7 @@ function PhotoDeckAPI.updatePhoto(photoId, urlname, attributes, handleNotFound)
     table.insert(content, { name = 'media[content]', filePath = attributes.contentPath, fileName = PhotoDeckUtils.basename(attributes.contentPath), contentType = 'image/jpeg' })
   end
   if attributes.publishToGallery then
-    table.insert(content, { name = 'media[publish_to_galleries]', value = attributes.publishToGallery.uuid })
+    table.insert(content, { name = 'media[publish_to_galleries]', value = attributes.publishToGallery })
   end
   if attributes.lrPhoto then
     local attributesFromLrPhoto = buildPhotoInfoFromLrPhoto(attributes.lrPhoto)
@@ -975,10 +969,6 @@ function PhotoDeckAPI.updatePhoto(photoId, urlname, attributes, handleNotFound)
   local media = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.updatePhoto)
   if not media and not error_msg then
     error_msg = LOC("$$$/PhotoDeck/API/Media/UpdateFailed=Update failed")
-  end
-  if not error_msg and attributes.publishToGallery then
-    local website = PhotoDeckAPI.website(urlname)
-    media.url = website.homeurl .. '/-/' .. attributes.publishToGallery.fullurlpath .. "/-/medias/" .. media.uuid
   end
   --logger:trace('PhotoDeckAPI.updatePhoto: ' .. printTable(media))
   return media, error_msg

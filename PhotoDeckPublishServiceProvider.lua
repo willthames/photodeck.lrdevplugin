@@ -5,6 +5,7 @@ local LrFileUtils = import 'LrFileUtils'
 local LrTasks = import 'LrTasks'
 local LrView = import 'LrView'
 local LrErrors = import 'LrErrors'
+local LrHttp = import 'LrHttp'
 
 local logger = import 'LrLogger'( 'PhotoDeckPublishLightroomPlugin' )
 
@@ -586,7 +587,7 @@ function publishServiceProvider.processRenderedPhotos( functionContext, exportCo
           if not photoAlreadyPublished or exportSettings.uploadOnRepublish then
             photoAttributes.contentPath = pathOrMessage
           end
-          photoAttributes.publishToGallery = gallery
+          photoAttributes.publishToGallery = gallery.uuid
           photoAttributes.lrPhoto = photo
   
           -- Upload or replace/update the photo.
@@ -607,9 +608,6 @@ function publishServiceProvider.processRenderedPhotos( functionContext, exportCo
 	if not error_msg and upload and upload.uuid and upload.uuid ~= "" then
 	  if isPublish then
             rendition:recordPublishedPhotoId(upload.uuid)
-	    if upload.url then
-              rendition:recordPublishedPhotoUrl(upload.url)
-            end
 
 	    -- Also save the remote photo ID at the LrPhoto level, so that we can find it when publishing in a different gallery
 	    catalog:withWriteAccessDo( "publish", function( context )
@@ -806,6 +804,38 @@ publishServiceProvider.deletePublishedCollection = function( publishSettings, in
   local result, error_msg = PhotoDeckAPI.deleteGallery(urlname, galleryId)
   if error_msg then
     LrErrors.throwUserError(LOC("$$$/PhotoDeck/DeleteCollection/ErrorDeletingGallery=Error deleting gallery: ^1", error_msg))
+  end
+end
+
+publishServiceProvider.goToPublishedPhoto = function( publishSettings, info )
+  logger:trace('publishServiceProvider.goToPublishedPhoto')
+  local catalog = LrApplication.activeCatalog()
+
+  -- The following is just ugly and not robust, but Lightroom doesn't gives us the LrPublishedCollection object, just it's name and parents.
+  -- So we need to go to it's parent and find the parent children that matches the collection name...
+  local publishedCollectionParent = info.publishService
+  for _, parent in pairs(info.publishedCollectionInfo.parents) do
+    publishedCollectionParent = catalog:getPublishedCollectionByLocalIdentifier(parent.localCollectionId)
+  end
+  local publishedCollection = nil
+  for _, collection in pairs(publishedCollectionParent:getChildCollections()) do
+    if collection:getName() == info.publishedCollectionInfo.name then
+      publishedCollection = collection
+      break
+    end
+  end
+  
+  if publishedCollection then
+    local galleryurl = publishedCollection:getRemoteUrl()
+    if galleryurl and galleryurl ~= '' then
+      local url = galleryurl .. '/-/medias/' .. info.remoteId
+      logger:trace('Opening ' .. url)
+      LrHttp.openUrlInBrowser(url)
+    else
+      LrErrors.throwUserError(LOC("$$$/PhotoDeck/GoToPublishedPhoto/GalleryUrlNotFound=Gallery address is not known yet"))
+    end
+  else
+    LrErrors.throwUserError(LOC("$$$/PhotoDeck/GoToPublishedPhoto/CollectionNotFound=Error finding collection"))
   end
 end
 

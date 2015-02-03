@@ -68,3 +68,5 @@
 "$$$/PhotoDeck/API/Media/UploadFailed=Erreur lors de l'import"
 "$$$/PhotoDeck/API/Media/UpdateFailed=Erreur lors de la mise à jour"
 "$$$/PhotoDeck/API/GalleryDisplayStyles/Empty=Erreur lors de la récupération des styles d'affichage des galeries"
+"$$$/PhotoDeck/GoToPublishedPhoto/GalleryUrlNotFound=L'adresse de la galerie n'est pas encore connue"
+"$$$/PhotoDeck/GoToPublishedPhoto/CollectionNotFound=Collection non trouvée"
