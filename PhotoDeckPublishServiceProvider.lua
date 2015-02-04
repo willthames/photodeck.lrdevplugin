@@ -555,15 +555,27 @@ function publishServiceProvider.processRenderedPhotos( functionContext, exportCo
     -- Get next photo.
     local photo = rendition.photo
     local photoId = nil
+    local catalogKey = nil
 
     -- See if we previously uploaded this photo.
     if isPublish then
       photoId = rendition.publishedPhotoId or uploadedPhotoIds[photo.localIdentifier]
+      local isVirtualCopy = photo:getRawMetadata('isVirtualCopy')
+      if isVirtualCopy then
+        -- virtual copy shares the same metadata catalog entries it seems, so we use a different key to store the PhotoDeck ID
+        catalogKey = websiteuuid .. "/" .. tostring(photo.localIdentifier)
+      else
+        catalogKey = websiteuuid
+      end
       if not photoId then
         -- previously published in another gallery?
         catalog:withReadAccessDo( function()
           local photoIds = getPhotoDeckPhotoIdsStoredInCatalog(photo)
-          photoId = photoIds[websiteuuid] or photoIds['']
+	  if isVirtualCopy then
+            photoId = photoIds[catalogKey]
+          else
+            photoId = photoIds[catalogKey] or photoIds['']
+	  end
         end)
       end
     end
@@ -611,7 +623,7 @@ function publishServiceProvider.processRenderedPhotos( functionContext, exportCo
 
 	    -- Also save the remote photo ID at the LrPhoto level, so that we can find it when publishing in a different gallery
 	    catalog:withWriteAccessDo( "publish", function( context )
-              storePhotoDeckPhotoIdsInCatalog(photo, websiteuuid, upload.uuid)
+              storePhotoDeckPhotoIdsInCatalog(photo, catalogKey, upload.uuid)
             end)
           end
 
