@@ -213,22 +213,6 @@ local function onGalleryDisplayStyleSelect(propertyTable, key, value)
   end
 end
 
-local function getGalleryDisplayStyles(propertyTable, collectionInfo)
-  collectionInfo.galleryDisplayStyles = {}
-  LrTasks.startAsyncTask(function()
-    PhotoDeckAPI.connect(propertyTable.apiKey, propertyTable.apiSecret, propertyTable.username, propertyTable.password)
-    local galleryDisplayStyles, error_msg = PhotoDeckAPI.galleryDisplayStyles(propertyTable.websiteChosen)
-    if galleryDisplayStyles and not error_msg then
-      for k, v in pairs(galleryDisplayStyles) do
-        table.insert(collectionInfo.galleryDisplayStyles, { title = v.name, value = v.uuid })
-      end
-      if collectionInfo.display_style and collectionInfo.display_style ~= '' then
-        onGalleryDisplayStyleSelect(collectionInfo, nil, collectionInfo.display_style)
-      end
-    end
-  end, 'PhotoDeckAPI Get Gallery Display Styles')
-end
-
 function publishServiceProvider.startDialog(propertyTable)
   propertyTable.loggedin = false
   propertyTable.websiteChoices = {}
@@ -350,7 +334,9 @@ function publishServiceProvider.sectionsForTopOfDialog( f, propertyTable )
       f:column {
         f:static_text {
           title = LrView.bind 'connectionStatus',
+	  font = '<system/small/bold>',
 	  width = 300,
+	  height_in_lines = 2
         },
       },
     },
@@ -721,30 +707,72 @@ end
 
 publishServiceProvider.viewForCollectionSettings = function( f, publishSettings, info )
   info.collectionSettings:addObserver('display_style', onGalleryDisplayStyleSelect)
-  getGalleryDisplayStyles(publishSettings, info.collectionSettings)
+
+  info.collectionSettings.galleryDisplayStyles = {}
+
+  publishSettings.connectionStatus = LOC "$$$/PhotoDeck/CollectionSettingsDialog/ConnectionStatus/Connecting=Connecting to PhotoDeck^."
+  LrTasks.startAsyncTask(function()
+    PhotoDeckAPI.connect(publishSettings.apiKey, publishSettings.apiSecret, publishSettings.username, publishSettings.password)
+    local error_msg = nil
+
+    local galleryId = info.publishedCollection:getRemoteId()
+    if galleryId and galleryID ~= '' then
+      -- read current live settings
+      local gallery
+      gallery, error_msg = PhotoDeckAPI.gallery(publishSettings.websiteChosen, galleryId)
+      if error_msg then
+        publishSettings.connectionStatus = LOC("$$$/PhotoDeck/CollectionSettingsDialog/ConnectionStatus/GalleryFailed=Error reading gallery from PhotoDeck: ^1", error_msg)
+      else
+	info.collectionSettings.LR_liveName = gallery.name
+	info.collectionSettings.description = gallery.description
+	info.collectionSettings.display_style = gallery.displaystyle
+      end
+    end
+
+    if not error_msg then
+      local galleryDisplayStyles
+      galleryDisplayStyles, error_msg = PhotoDeckAPI.galleryDisplayStyles(publishSettings.websiteChosen)
+      if error_msg then
+        publishSettings.connectionStatus = LOC("$$$/PhotoDeck/CollectionSettingsDialog/ConnectionStatus/GalleryDisplayStylesFailed=Error reading gallery display styles from PhotoDeck: ^1", error_msg)
+      elseif galleryDisplayStyles then
+        -- populate gallery display style choices
+        for k, v in pairs(galleryDisplayStyles) do
+          table.insert(info.collectionSettings.galleryDisplayStyles, { title = v.name, value = v.uuid })
+        end
+        if info.collectionSettings.display_style and info.collectionSettings.display_style ~= '' then
+          onGalleryDisplayStyleSelect(info.collectionSettings, nil, info.collectionSettings.display_style)
+        end
+      end
+    end
+
+    if not error_msg then
+      publishSettings.connectionStatus = LOC("$$$/PhotoDeck/CollectionSettingsDialog/ConnectionStatus/OK=Connected to PhotoDeck")
+    end
+
+  end, 'PhotoDeckAPI Get Gallery Attributes')
+
   local c = f:view {
     bind_to_object = info,
     spacing = f:dialog_spacing(),
 
     f:row {
       f:static_text {
-        title = LOC("$$$/PhotoDeck/CollectionSettingsDialog/Name=Name:"),
-        width = LrView.share "collectionset_labelwidth",
-      },
-      f:static_text {
-        title = LrView.bind 'name',
+        bind_to_object = publishSettings,
+        title = LrView.bind 'connectionStatus',
+	font = '<system/small/bold>',
+	fill_horizontal = 1
       }
     },
     f:row {
       f:static_text {
-        title = LOC("$$$/PhotoDeck/CollectionSettingsDialog/Description=Description:"),
+        title = LOC("$$$/PhotoDeck/CollectionSettingsDialog/Description=Introduction:"),
         width = LrView.share "collectionset_labelwidth",
       },
       f:edit_field {
         bind_to_object = info.collectionSettings,
         value = LrView.bind 'description',
-        width_in_chars = 40,
-        height_in_chars = 5,
+        width_in_chars = 60,
+        height_in_lines = 8,
       }
     },
     f:row {
@@ -756,14 +784,15 @@ publishServiceProvider.viewForCollectionSettings = function( f, publishSettings,
         bind_to_object = info.collectionSettings,
         title = LrView.bind 'galleryDisplayStyleName',
         width_in_chars = 30,
+	fill_horizontal = 1
       },
       f:push_button {
         bind_to_object = info.collectionSettings,
         action = function() chooseGalleryDisplayStyle(publishSettings, info.collectionSettings) end,
         enabled = LrBinding.keyIsNotNil 'galleryDisplayStyles',
-        title = LOC("$$$/PhotoDeck/CollectionSettingsDialog/ChooseGalleryDisplayStyleAction=Choose Gallery Style"),
+        title = LOC("$$$/PhotoDeck/CollectionSettingsDialog/ChooseGalleryDisplayStyleAction=Change Style"),
       }
-    }
+    },
   }
   return c
 end
