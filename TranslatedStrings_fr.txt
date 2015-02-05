@@ -42,6 +42,7 @@
 "$$$/PhotoDeck/ConnectionStatus/CredentialsError=Erreur de connexion : vérifiez votre identifiant et mot de passe"
 "$$$/PhotoDeck/ConnectionStatus/LoggedInAs=Connecté en temps que ^1 ^2"
 "$$$/PhotoDeck/ConnectionStatus/FailedLoadingWebsite=Erreur au chargement de votre site web : ^1"
+"$$$/PhotoDeck/SynchronizeStatus/Title=Synchronisation des galeries^."
 "$$$/PhotoDeck/SynchronizeStatus/InProgress=En cours^."
 "$$$/PhotoDeck/SynchronizeStatus/Starting=Démarrage^."
 "$$$/PhotoDeck/SynchronizeStatus/FinishedWithNoChanges=Terminé, aucun changements"

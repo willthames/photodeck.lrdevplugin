@@ -2,6 +2,7 @@ local LrBinding = import 'LrBinding'
 local LrDialogs = import 'LrDialogs'
 local LrTasks = import 'LrTasks'
 local LrView = import 'LrView'
+local LrProgressScope = import 'LrProgressScope'
 
 local PhotoDeckAPI = require 'PhotoDeckAPI'
 local PhotoDeckUtils = require 'PhotoDeckUtils'
@@ -88,11 +89,16 @@ end
 
 -- What happens when user clicks "Synchronize galleries" in plugin settings
 local function synchronizeGalleries(propertyTable)
-  propertyTable.synchronizeGalleriesResult = LOC("$$$/PhotoDeck/SynchronizeStatus/Starting=Starting^.")
+  propertyTable.synchronizeGalleriesResult = LOC("$$$/PhotoDeck/SynchronizeStatus/InProgress=In progress^.")
   propertyTable.canSynchronize = false
+  local progressScope = LrProgressScope({
+    title = LOC("$$$/PhotoDeck/SynchronizeStatus/Title=Gallery synchronization^."),
+    caption = LOC("$$$/PhotoDeck/SynchronizeStatus/Starting=Starting^.") })
+  progressScope:setCancelable(true)
   LrTasks.startAsyncTask(function()
     PhotoDeckAPI.connect(propertyTable.apiKey, propertyTable.apiSecret, propertyTable.username, propertyTable.password)
-    local result, error_msg = PhotoDeckAPI.synchronizeGalleries(propertyTable.websiteChosen, propertyTable)
+    local result, error_msg = PhotoDeckAPI.synchronizeGalleries(propertyTable.websiteChosen, propertyTable.LR_publishService, progressScope)
+
     if error_msg then
       propertyTable.synchronizeGalleriesResult = error_msg
     elseif result then
@@ -105,6 +111,8 @@ local function synchronizeGalleries(propertyTable)
       propertyTable.synchronizeGalleriesResult = "?"
     end
     propertyTable.canSynchronize = true
+    progressScope:setCaption(propertyTable.synchronizeGalleriesResult)
+    progressScope:done()
   end, 'PhotoDeckAPI galleries synchronization')
 end
 
