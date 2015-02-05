@@ -748,11 +748,11 @@ function PhotoDeckAPI.synchronizeGalleries(urlname, propertyTable)
 
       if lrCollectionSet then
 	-- Already properly connected, good
-        logger:trace(string.format("SYNC: PhotoDeck gallery %s '%s' already connected to Lightroom Published Collection Set %i. Doing nothing.", uuid, gallery.name, lrCollectionSet.localIdentifier))
 	local collectionSettings = lrCollectionSet:getCollectionSetInfoSummary().collectionSettings or {}
 	if lrCollectionSet:getRemoteUrl() ~= gallery.fullurl
 	   or collectionSettings.description ~= gallery.description
 	   or collectionSettings.display_style ~= gallery.displaystyle then
+          logger:trace(string.format("SYNC: PhotoDeck gallery %s '%s' already connected to Lightroom Published Collection Set %i. Updating.", uuid, gallery.name, lrCollectionSet.localIdentifier))
 	  collectionSettings.description = gallery.description
 	  collectionSettings.display_style = gallery.displaystyle
 	  catalog:withWriteAccessDo('Resynchronize LR collection settings', function()
@@ -760,14 +760,16 @@ function PhotoDeckAPI.synchronizeGalleries(urlname, propertyTable)
 	    lrCollectionSet:setCollectionSetSettings(collectionSettings)
           end)
 	  updateCount = updateCount + 1
+        else
+          logger:trace(string.format("SYNC: PhotoDeck gallery %s '%s' already connected to Lightroom Published Collection Set %i. Doing nothing.", uuid, gallery.name, lrCollectionSet.localIdentifier))
         end
       elseif lrCollection then
 	-- Already properly connected, good
-        logger:trace(string.format("SYNC: PhotoDeck gallery %s '%s' already connected to Lightroom Published Collection %i. Doing nothing.", uuid, gallery.name, lrCollection.localIdentifier))
 	local collectionSettings = lrCollection:getCollectionInfoSummary().collectionSettings or {}
 	if lrCollection:getRemoteUrl() ~= gallery.fullurl
 	   or collectionSettings.description ~= gallery.description
 	   or collectionSettings.display_style ~= gallery.displaystyle then
+          logger:trace(string.format("SYNC: PhotoDeck gallery %s '%s' already connected to Lightroom Published Collection %i. Updating.", uuid, gallery.name, lrCollection.localIdentifier))
 	  collectionSettings.description = gallery.description
 	  collectionSettings.display_style = gallery.displaystyle
 	  catalog:withWriteAccessDo('Resynchronize LR collection settings', function()
@@ -775,6 +777,8 @@ function PhotoDeckAPI.synchronizeGalleries(urlname, propertyTable)
 	    lrCollection:setCollectionSettings(collectionSettings)
           end)
 	  updateCount = updateCount + 1
+	else
+          logger:trace(string.format("SYNC: PhotoDeck gallery %s '%s' already connected to Lightroom Published Collection %i. Doing nothing.", uuid, gallery.name, lrCollection.localIdentifier))
         end
       else
 	-- Missing in Lightroom: create
@@ -807,7 +811,7 @@ function PhotoDeckAPI.synchronizeGalleries(urlname, propertyTable)
 	    catalog:withWriteAccessDo('Set LR collection settings', function()
               lrCollectionSet:setRemoteId(uuid)
               lrCollectionSet:setRemoteUrl(gallery.fullurl)
-	      lrCollectionSet:setCollectionSettings(collectionSettings)
+	      lrCollectionSet:setCollectionSetSettings(collectionSettings)
 	    end)
 	    createCount = createCount + 1
 	  else
