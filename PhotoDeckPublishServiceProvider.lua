@@ -66,6 +66,10 @@ publishServiceProvider.startDialog = PhotoDeckDialogs.startDialog
 publishServiceProvider.sectionsForTopOfDialog = PhotoDeckDialogs.sectionsForTopOfDialog
 
 
+-- Dialog when a publish service has been created
+publishServiceProvider.didCreateNewPublishService = PhotoDeckDialogs.didCreateNewPublishService
+
+
 -- Published collection / collection set settings dialog
 publishServiceProvider.viewForCollectionSettings = PhotoDeckDialogs.viewForCollectionSettings
 publishServiceProvider.viewForCollectionSetSettings = PhotoDeckDialogs.viewForCollectionSettings

@@ -22,7 +22,7 @@ local function ping(propertyTable)
     PhotoDeckAPI.connect(propertyTable.apiKey, propertyTable.apiSecret, propertyTable.username, propertyTable.password)
     local ping, error_msg = PhotoDeckAPI.ping()
     if error_msg then
-      propertyTable.onnectionStatus = LOC("$$$/PhotoDeck/ConnectionStatus/Failed=Connection failed: ^1", error_msg)
+      propertyTable.connectionStatus = LOC("$$$/PhotoDeck/ConnectionStatus/Failed=Connection failed: ^1", error_msg)
     elseif propertyTable.loggedin then
       propertyTable.connectionStatus = LOC "$$$/PhotoDeck/ConnectionStatus/Connected=Connected"
     else
@@ -186,6 +186,14 @@ function PhotoDeckDialogs.startDialog(propertyTable)
   propertyTable.websiteName = ''
   propertyTable.canSynchronize = PhotoDeckAPI.canSynchronize
   propertyTable.synchronizeGalleriesResult = ''
+
+  if not propertyTable.LR_editingExistingPublishConnection then
+    -- new connection: reset credentials
+    propertyTable.username = nil
+    propertyTable.password = nil
+    PhotoDeckAPI.loggedin = false
+  end
+
 
   propertyTable:addObserver('loggedin', function() updateCantExportBecause(propertyTable) end)
   updateCantExportBecause(propertyTable)
@@ -352,20 +360,15 @@ function PhotoDeckDialogs.sectionsForTopOfDialog(f, propertyTable)
 
     f:row {
       f:push_button {
-        title = LOC "$$$/PhotoDeck/PublishOptionsDialog/SynchronizeGalleriesAction=Import PhotoDeck galleries",
+        title = LOC "$$$/PhotoDeck/PublishOptionsDialog/SynchronizeGalleries/Action=Import PhotoDeck galleries",
         action = function()
-                   if not propertyTable.LR_publishService then
-		     -- publish service is not created yet (this is a new unsaved plugin instance)
-		     LrDialogs.message(LOC "$$$/PhotoDeck/PublishOptionsDialog/SaveFirst=Please save the settings first!")
-	           else
-		     local result = LrDialogs.confirm(
-		       LOC "$$$/PhotoDeck/PublishOptionsDialog/ConfirmTitle=This will mirror your existing PhotoDeck galleries in Lightroom.",
-		       LOC "$$$/PhotoDeck/PublishOptionsDialog/ConfirmSubtitle=Gallery content is currently not imported.",
-		       LOC "$$$/PhotoDeck/PublishOptionsDialog/ProceedAction=Proceed",
-		       LOC "$$$/PhotoDeck/PublishOptionsDialog/CancelAction=Cancel")
-		     if result == "ok" then
-                       synchronizeGalleries(propertyTable)
-		     end
+		   local result = LrDialogs.confirm(
+		     LOC "$$$/PhotoDeck/PublishOptionsDialog/SynchronizeGalleries/ConfirmTitle=This will mirror your existing PhotoDeck galleries in Lightroom.",
+		     LOC "$$$/PhotoDeck/PublishOptionsDialog/SynchronizeGalleries/ConfirmSubtitle=Gallery content is currently not imported.",
+		     LOC "$$$/PhotoDeck/PublishOptionsDialog/SynchronizeGalleries/ProceedAction=Proceed",
+		     LOC "$$$/PhotoDeck/PublishOptionsDialog/SynchronizeGalleries/CancelAction=Cancel")
+		   if result == "ok" then
+                     synchronizeGalleries(propertyTable)
 	           end
 	end,
 	enabled = LrBinding.andAllKeys('loggedin', 'canSynchronize'),
@@ -389,6 +392,20 @@ function PhotoDeckDialogs.sectionsForTopOfDialog(f, propertyTable)
     table.insert(dialogs, publishSettings);
   end
   return dialogs
+end
+
+
+-- Dialog when a publish service has been created
+function PhotoDeckDialogs.didCreateNewPublishService(publishSettings, info)
+  local result = LrDialogs.confirm(
+    LOC "$$$/PhotoDeck/InitialSynchronizationDialog/Title=Would you like to import your existing PhotoDeck galleries in Lightroom now?",
+    LOC "$$$/PhotoDeck/InitialSynchronizationDialog/ConfirmSubtitle=Gallery content is currently not imported.^nYou can also import (or re-import) your PhotoDeck galleries later from the plugin settings.",
+    LOC "$$$/PhotoDeck/InitialSynchronizationDialog/ProceedAction=Yes, proceed now",
+    LOC "$$$/PhotoDeck/InitialSynchronizationDialog/NoAction=No")
+  if result == "ok" then
+    publishSettings.LR_publishService = info.publishService
+    synchronizeGalleries(publishSettings)
+  end
 end
 
 
