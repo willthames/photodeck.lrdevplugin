@@ -1,3 +1,14 @@
+0.11 - 05/02/2015
+-----------------
+Multiple accounts fixes
+Virtual copies support
+Always show current gallery description and display styles in gallery/folder settings
+Usability improvements for first time users
+PhotoDeck galleries structure synchronization gets a proper cancelable progress bar
+Minor performance improvements
+Minor fixes
+Code reorganisation
+
 0.10 - 03/02/2015
 -----------------
 Improved robustness and performance
