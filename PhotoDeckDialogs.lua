@@ -195,8 +195,8 @@ function PhotoDeckDialogs.startDialog(propertyTable)
   propertyTable.canSynchronize = PhotoDeckAPI.canSynchronize
   propertyTable.synchronizeGalleriesResult = ''
 
-  if not propertyTable.LR_editingExistingPublishConnection then
-    -- new connection: reset credentials
+  if propertyTable.LR_editingExistingPublishConnection == false then
+    -- new publish connection: reset credentials
     propertyTable.username = nil
     propertyTable.password = nil
     PhotoDeckAPI.loggedin = false
@@ -331,13 +331,13 @@ function PhotoDeckDialogs.sectionsForTopOfDialog(f, propertyTable)
       f:column {
 	f:row {
           f:static_text {
-	    visible = LrBinding.andAllKeys('LR_publishService', 'loggedin'),
+	    visible = LrBinding.andAllKeys('loggedin'),
             title = LOC "$$$/PhotoDeck/AccountDialog/Website=Website:",
             width = LrView.share "user_label_width",
             alignment = 'right'
           },
           f:static_text {
-	    visible = LrBinding.andAllKeys('LR_publishService', 'loggedin'),
+	    visible = LrBinding.andAllKeys('loggedin'),
             title = LrView.bind 'websiteName',
             width = 300,
           }
@@ -347,7 +347,7 @@ function PhotoDeckDialogs.sectionsForTopOfDialog(f, propertyTable)
       f:column {
         f:push_button {
           title = LOC "$$$/PhotoDeck/AccountDialog/WebsiteChangeAction=Change",
-	  visible = LrBinding.andAllKeys('LR_publishService', 'loggedin'),
+	  visible = LrBinding.andAllKeys('loggedin'),
 	  enabled = LrBinding.andAllKeys('loggedin', 'multipleWebsites'),
           action = function() propertyTable = chooseWebsite(propertyTable) end,
         },
@@ -407,7 +407,7 @@ end
 function PhotoDeckDialogs.didCreateNewPublishService(publishSettings, info)
   local result = LrDialogs.confirm(
     LOC "$$$/PhotoDeck/InitialSynchronizationDialog/Title=Would you like to import your existing PhotoDeck galleries in Lightroom now?",
-    LOC "$$$/PhotoDeck/InitialSynchronizationDialog/ConfirmSubtitle=Gallery content is currently not imported.^nYou can also import (or re-import) your PhotoDeck galleries later from the plugin settings.",
+    LOC "$$$/PhotoDeck/InitialSynchronizationDialog/ConfirmSubtitle=Gallery content is currently not imported.^n^nYou can also import (or re-import) your PhotoDeck galleries later from the publish service settings.",
     LOC "$$$/PhotoDeck/InitialSynchronizationDialog/ProceedAction=Yes, proceed now",
     LOC "$$$/PhotoDeck/InitialSynchronizationDialog/NoAction=No")
   if result == "ok" then

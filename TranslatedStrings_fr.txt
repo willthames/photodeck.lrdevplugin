@@ -22,7 +22,7 @@
 "$$$/PhotoDeck/PublishOptionsDialog/SynchronizeGalleries/ProceedAction=Procéder"
 "$$$/PhotoDeck/PublishOptionsDialog/SynchronizeGalleries/CancelAction=Annuler"
 "$$$/PhotoDeck/InitialSynchronizationDialog/Title=Souhaitez-vous importer vos galeries PhotoDeck existantes dans Lightroom maintenant ?"
-"$$$/PhotoDeck/InitialSynchronizationDialog/ConfirmSubtitle=Le contenu des galeries n'est actuellement pas importé.^nVous pouvez également importer (ou ré-importer) vos galeries PhotoDeck ultérieurement, depuis les paramètres du plugin."
+"$$$/PhotoDeck/InitialSynchronizationDialog/ConfirmSubtitle=Le contenu des galeries n'est actuellement pas importé.^n^nVous pouvez également importer (ou ré-importer) vos galeries PhotoDeck ultérieurement, depuis les paramètres du service de publication."
 "$$$/PhotoDeck/InitialSynchronizationDialog/ProceedAction=Oui, procéder maintenant"
 "$$$/PhotoDeck/InitialSynchronizationDialog/NoAction=Non"
 "$$$/PhotoDeck/WebsitesDialog/Title=Sites web PhotoDeck"
