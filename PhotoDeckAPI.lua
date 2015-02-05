@@ -378,13 +378,21 @@ function PhotoDeckAPI.createOrUpdateGallery(urlname, collectionInfo, updateSetti
     gallery = PhotoDeckAPI.gallery(urlname, galleryId)
 
     if gallery then
-      -- check LR parent and see if we the PD gallery is still properly connected
+      local parentsCount = 0
+
+      -- check LR parent and see if the PD gallery is still properly connected
       for _, parent in pairs(collectionInfo.parents) do
+	parentsCount = parentsCount + 1
         if parent.remoteCollectionId == gallery.parentuuid then
           -- ok, found, no need to go back to all parents one by one to reconnect everything
           parentGalleryId = gallery.parentuuid
-	  break
+          break
         end
+      end
+
+      if parentsCount == 0 then
+        -- top level gallery
+        parentGalleryId = website.rootgalleryuuid
       end
     end
   end
