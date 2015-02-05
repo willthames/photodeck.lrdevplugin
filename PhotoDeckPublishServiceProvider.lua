@@ -193,10 +193,10 @@ local function synchronizeGalleries(propertyTable)
     if error_msg then
       propertyTable.synchronizeGalleriesResult = error_msg
     elseif result then
-      if result.created == 0 and result.deleted == 0 and result.errors == 0 then
+      if result.created == 0 and result.deleted == 0 and result.updated == 0 and result.errors == 0 then
         propertyTable.synchronizeGalleriesResult = LOC("$$$/PhotoDeck/SynchronizeStatus/FinishedWithNoChanges=Finished, no changes")
       else
-        propertyTable.synchronizeGalleriesResult = LOC("$$$/PhotoDeck/SynchronizeStatus/FinishedWithChanges=Finished: ^1 created, ^2 deleted, ^3 errors", result.created, result.deleted, result.errors)
+        propertyTable.synchronizeGalleriesResult = LOC("$$$/PhotoDeck/SynchronizeStatus/FinishedWithChanges=Finished: ^1 created, ^2 deleted, ^3 updated, ^4 errors", result.created, result.deleted, result.updated, result.errors)
       end
     else
       propertyTable.synchronizeGalleriesResult = "?"
@@ -382,15 +382,15 @@ function publishServiceProvider.sectionsForTopOfDialog( f, propertyTable )
 
     f:row {
       f:push_button {
-        title = LOC "$$$/PhotoDeck/PublishOptionsDialog/SynchronizeGalleriesAction=Import existing PhotoDeck galleries",
+        title = LOC "$$$/PhotoDeck/PublishOptionsDialog/SynchronizeGalleriesAction=Import PhotoDeck galleries",
         action = function()
                    if not propertyTable.LR_publishService then
 		     -- publish service is not created yet (this is a new unsaved plugin instance)
 		     LrDialogs.message(LOC "$$$/PhotoDeck/PublishOptionsDialog/SaveFirst=Please save the settings first!")
 	           else
 		     local result = LrDialogs.confirm(
-		       LOC "$$$/PhotoDeck/PublishOptionsDialog/ConfirmTitle=This will import and connect your existing PhotoDeck galleries structure in Lightroom.",
-		       LOC "$$$/PhotoDeck/PublishOptionsDialog/ConfirmSubtitle=Galleries that are already connected won't be touched.^nGallery content is currently not imported.",
+		       LOC "$$$/PhotoDeck/PublishOptionsDialog/ConfirmTitle=This will mirror your existing PhotoDeck galleries in Lightroom.",
+		       LOC "$$$/PhotoDeck/PublishOptionsDialog/ConfirmSubtitle=Gallery content is currently not imported.",
 		       LOC "$$$/PhotoDeck/PublishOptionsDialog/ProceedAction=Proceed",
 		       LOC "$$$/PhotoDeck/PublishOptionsDialog/CancelAction=Cancel")
 		     if result == "ok" then
