@@ -6,6 +6,7 @@
 "$$$/PhotoDeck/ApiKeyDialog/ApiKey=Clé de l'API :"
 "$$$/PhotoDeck/ApiKeyDialog/ApiSecret=Secret de l'API :"
 "$$$/PhotoDeck/ApiKeyDialog/ChangeAction=Modifier",
+"$$$/PhotoDeck/AccountDialog/NoLogin=Vous ne vous êtes pas encore identifié sur PhotoDeck."
 "$$$/PhotoDeck/AccountDialog/Title=Compte PhotoDeck"
 "$$$/PhotoDeck/AccountDialog/Account=Compte PhotoDeck"
 "$$$/PhotoDeck/AccountDialog/Email=Email :"
@@ -33,7 +34,7 @@
 "$$$/PhotoDeck/ConnectionStatus/Connecting=Connection à PhotoDeck en cours^."
 "$$$/PhotoDeck/ConnectionStatus/Failed=La connexion a échouée : ^1"
 "$$$/PhotoDeck/ConnectionStatus/Connected=Connecté"
-"$$$/PhotoDeck/ConnectionStatus/ConnectedPleaseLogin=Connecté, merci de vous signer"
+"$$$/PhotoDeck/ConnectionStatus/ConnectedPleaseLogin=Connecté, merci de vous identifier"
 "$$$/PhotoDeck/ConnectionStatus/LoggingIn=Connection en cours^."
 "$$$/PhotoDeck/ConnectionStatus/CredentialsError=Erreur de connexion : vérifiez votre identifiant et mot de passe"
 "$$$/PhotoDeck/ConnectionStatus/LoggedInAs=Connecté en temps que ^1 ^2"

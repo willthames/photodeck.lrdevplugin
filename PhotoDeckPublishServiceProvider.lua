@@ -96,6 +96,14 @@ local function chooseWebsite(propertyTable)
   return propertyTable
 end
 
+local function updateCantExportBecause(propertyTable)
+  if not propertyTable.loggedin then
+    propertyTable.LR_cantExportBecause = LOC "$$$/PhotoDeck/AccountDialog/NoLogin=You haven't logged in to PhotoDeck yet."
+    return
+  end
+  propertyTable.LR_cantExportBecause = nil
+end
+
 local function onWebsiteSelect(propertyTable, key, value)
   propertyTable.websiteName = propertyTable.websites[value].title
 end
@@ -221,6 +229,11 @@ function publishServiceProvider.startDialog(propertyTable)
   propertyTable.canSynchronize = PhotoDeckAPI.canSynchronize
   propertyTable.synchronizeGalleriesResult = ''
 
+  propertyTable:addObserver('loggedin', function() updateCantExportBecause(propertyTable) end)
+  updateCantExportBecause(propertyTable)
+
+  propertyTable:addObserver('websiteChosen', onWebsiteSelect)
+
   local keysAreValid = PhotoDeckAPI.hasDistributionKeys or (
     propertyTable.apiKey and propertyTable.apiKey ~= '' and
     propertyTable.apiSecret and propertyTable.apiSecret ~= '')
@@ -235,8 +248,6 @@ function publishServiceProvider.startDialog(propertyTable)
   else
     ping(propertyTable)
   end
-
-  propertyTable:addObserver('websiteChosen', onWebsiteSelect)
 end
 
 function publishServiceProvider.sectionsForTopOfDialog( f, propertyTable )
