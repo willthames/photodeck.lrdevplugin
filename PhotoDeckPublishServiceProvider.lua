@@ -715,17 +715,20 @@ publishServiceProvider.viewForCollectionSettings = function( f, publishSettings,
     PhotoDeckAPI.connect(publishSettings.apiKey, publishSettings.apiSecret, publishSettings.username, publishSettings.password)
     local error_msg = nil
 
-    local galleryId = info.publishedCollection:getRemoteId()
-    if galleryId and galleryID ~= '' then
-      -- read current live settings
-      local gallery
-      gallery, error_msg = PhotoDeckAPI.gallery(publishSettings.websiteChosen, galleryId)
-      if error_msg then
-        publishSettings.connectionStatus = LOC("$$$/PhotoDeck/CollectionSettingsDialog/ConnectionStatus/GalleryFailed=Error reading gallery from PhotoDeck: ^1", error_msg)
-      else
-	info.collectionSettings.LR_liveName = gallery.name
-	info.collectionSettings.description = gallery.description
-	info.collectionSettings.display_style = gallery.displaystyle
+    local publishedCollection = info.publishedCollection
+    if publishedCollection then
+      local galleryId = publishedCollection:getRemoteId()
+      if galleryId and galleryID ~= '' then
+        -- read current live settings
+        local gallery
+        gallery, error_msg = PhotoDeckAPI.gallery(publishSettings.websiteChosen, galleryId)
+        if error_msg then
+          publishSettings.connectionStatus = LOC("$$$/PhotoDeck/CollectionSettingsDialog/ConnectionStatus/GalleryFailed=Error reading gallery from PhotoDeck: ^1", error_msg)
+        else
+	  info.collectionSettings.LR_liveName = gallery.name
+  	  info.collectionSettings.description = gallery.description
+	  info.collectionSettings.display_style = gallery.displaystyle
+        end
       end
     end
 
