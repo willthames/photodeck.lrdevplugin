@@ -31,7 +31,6 @@ publishServiceProvider.titleForPublishedCollection = LOC("$$$/PhotoDeck/Publish/
 publishServiceProvider.titleForPublishedCollectionSet = LOC("$$$/PhotoDeck/Publish/CollectionSet=Folder")
 publishServiceProvider.titleForGoToPublishedCollection = LOC("$$$/PhotoDeck/Publish/GoToCollection=Go to PhotoDeck Gallery")
 publishServiceProvider.titleForGoToPublishedPhoto =  LOC("$$$/PhotoDeck/Publish/GoToPhoto=Go to Photo in PhotoDeck Gallery")
-publishServiceProvider.disableRenamePublishedCollectionSet = true
 
 -- these fields get stored between uses
 publishServiceProvider.exportPresetFields = {
@@ -799,6 +798,8 @@ publishServiceProvider.viewForCollectionSettings = function( f, publishSettings,
   }
   return c
 end
+
+publishServiceProvider.viewForCollectionSetSettings = publishServiceProvider.viewForCollectionSettings
 
 publishServiceProvider.updateCollectionSettings = function( publishSettings, info )
   logger:trace('publishServiceProvider.updateCollectionSettings')

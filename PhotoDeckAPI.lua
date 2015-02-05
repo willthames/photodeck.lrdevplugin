@@ -502,7 +502,11 @@ function PhotoDeckAPI.createOrUpdateGallery(urlname, collectionInfo, updateSetti
 	collectionSettings['description'] = gallery.description
 	collectionSettings['display_style'] = gallery.displaystyle
 	collection.catalog:withWriteAccessDo('Resynchronize LR collection settings', function()
-	  collection:setCollectionSettings(collectionSettings)
+	  if collection:type() == 'LrPublishedCollection' then
+	    collection:setCollectionSettings(collectionSettings)
+          elseif collection:type() == 'LrPublishedCollectionSet' then
+	    collection:setCollectionSetSettings(collectionSettings)
+          end
 	end)
       end
     end
