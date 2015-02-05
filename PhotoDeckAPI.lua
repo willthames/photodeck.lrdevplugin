@@ -1082,4 +1082,6 @@ function PhotoDeckAPI.deleteGallery(urlname, galleryId)
   return response, error_msg
 end
 
+
+-- Done
 return PhotoDeckAPI
