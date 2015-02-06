@@ -273,6 +273,23 @@ function publishServiceProvider.processRenderedPhotos( functionContext, exportCo
 	    catalog:withWriteAccessDo( "publish", function( context )
               storePhotoDeckPhotoIdsInCatalog(photo, catalogKey, upload.uuid)
             end)
+
+	    -- Mark all instances of this Lightroom Photo within our published collections as being clean (not edited).
+	    -- E.g., when metadata have been changed, re-publishing from any of the published collection will update the PhotoDeck photo for all. No need to re-publish from each published collection.
+	    if photoAlreadyPublished then
+              for _, publishedCollection in pairs(photo:getContainedPublishedCollections()) do
+	        if publishedCollection:getService().localIdentifier == exportContext.publishService.localIdentifier then
+		  for _, publishedPhotoCopy in pairs(publishedCollection:getPublishedPhotos()) do
+		    if publishedPhotoCopy:getPhoto().localIdentifier == photo.localIdentifier then
+		      catalog:withWriteAccessDo("Marking photo as clean", function( context )
+		        publishedPhotoCopy:setEditedFlag(false)
+		      end)
+		      break
+		    end
+		  end
+		end
+	      end
+	    end
           end
 
 	  -- Remember this in the list of photos we uploaded.
