@@ -189,9 +189,14 @@ return t
 
 PhotoDeckAPIXSLT.transform = function(xmlstring, xslt)
   if xmlstring and string.sub(xmlstring, 1, 5) == '<?xml' then
+    -- prevent LUA code injection
+    xmlstring, _ = string.gsub(xmlstring, '%[====%[', '')
+    xmlstring, _ = string.gsub(xmlstring, '%]====%]', '')
+
+    -- parse & load
+    --logger:trace("XML: " .. xmlstring)
     local xml = LrXml.parseXml(xmlstring)
     local luastring = xml:transform(xslt)
-    --logger:trace("XML: " .. xmlstring)
     --logger:trace("LUA: " .. luastring)
     if luastring ~= '' then
       local f = assert(loadstring(luastring))
