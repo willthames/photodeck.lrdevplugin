@@ -537,6 +537,11 @@ PhotoDeckDialogs.viewForCollectionSettings = function(f, publishSettings, info)
         title = LOC("$$$/PhotoDeck/CollectionSettingsDialog/ChooseGalleryDisplayStyleAction=Change Style"),
       }
     },
+    f:row {
+      f:static_text {
+        title = '' -- Dummy entry to give some vertical space, esp for MacOS
+      }
+    }
   }
   return c
 end
