@@ -34,9 +34,7 @@ local PhotoDeckAPICache = {}
 local function sign(method, uri, querystring)
   querystring = querystring or ''
   local cocoatime = LrDate.currentTime()
-  -- cocoatime = cocoatime - (cocoatime % 600)
-  -- Fri, 25 Jun 2010 12:39:15 +0200
-  local timestamp = LrDate.timeToUserFormat(cocoatime, "%b, %d %Y %H:%M:%S -0000", true)
+  local timestamp = LrDate.timeToW3CDate(cocoatime)
 
   local request = string.format('%s\n%s\n%s\n%s\n%s\n', method, uri,
                                 querystring, PhotoDeckAPI.secret, timestamp)
