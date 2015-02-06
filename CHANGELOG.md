@@ -1,3 +1,9 @@
+0.11.2 - 06/02/2015
+-------------------
+Fix connection issues for non english systems
+Minor fixes
+
+
 0.11 - 05/02/2015
 -----------------
 Multiple accounts fixes
