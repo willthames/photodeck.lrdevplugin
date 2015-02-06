@@ -543,7 +543,7 @@ function PhotoDeckAPI.synchronizeGalleries(urlname, publishService, progressScop
   local updateCount = 0
   local errorsCount = 0
 
-  progressScope:setCaption(LOC("$$$/PhotoDeck/SynchronizeStatus/Connecting=Connecting to PhotoDeck website..."))
+  progressScope:setCaption(LOC("$$$/PhotoDeck/SynchronizeStatus/Connecting=Connecting to PhotoDeck website"))
   local website = PhotoDeckAPI.website(urlname)
   local rootGalleryId = nil
   if website then
@@ -555,7 +555,7 @@ function PhotoDeckAPI.synchronizeGalleries(urlname, publishService, progressScop
     return nil, LOC("$$$/PhotoDeck/API/Galleries/RootNotFound=Couldn't find PhotoDeck root gallery")
   end
 
-  progressScope:setCaption(LOC("$$$/PhotoDeck/SynchronizeStatus/ReadingStructure=Reading PhotoDeck gallery structure..."))
+  progressScope:setCaption(LOC("$$$/PhotoDeck/SynchronizeStatus/ReadingStructure=Reading PhotoDeck gallery structure"))
   local photodeckGalleries, error_msg = PhotoDeckAPI.galleries(urlname)
 
   if not photodeckGalleries or error_msg then
@@ -580,7 +580,7 @@ function PhotoDeckAPI.synchronizeGalleries(urlname, publishService, progressScop
     if progressScope:isCanceled() then return end
 
     local parentPDGallery = photodeckGalleries[parentPDGalleryUUID]
-    progressScope:setCaption(LOC("$$$/PhotoDeck/SynchronizeStatus/Synchronizing=Synchronizing '^1'...", parentPDGallery.name))
+    progressScope:setCaption(LOC("$$$/PhotoDeck/SynchronizeStatus/Synchronizing=Synchronizing ^1", parentPDGallery.name))
     logger:trace(string.format("SYNC: Exploring PhotoDeck galleries under %s '%s' at depth %i", parentPDGalleryUUID, parentPDGallery.name, depth))
     local pdGalleries = photodeckGalleriesByParent[parentPDGalleryUUID] or {}
     local lrCollectionSets = parentLRCollectionSet:getChildCollectionSets()

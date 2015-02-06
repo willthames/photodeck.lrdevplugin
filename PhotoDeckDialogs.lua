@@ -80,7 +80,7 @@ local function login(propertyTable)
 
       -- show synchronization message if in progress
       if not propertyTable.canSynchronize then
-        propertyTable.synchronizeGalleriesResult = LOC("$$$/PhotoDeck/SynchronizeStatus/InProgress=In progress^.")
+        propertyTable.synchronizeGalleriesResult = LOC("$$$/PhotoDeck/SynchronizeStatus/InProgress=In progress")
       end
     end
   end, 'PhotoDeckAPI Login')
@@ -89,11 +89,11 @@ end
 
 -- What happens when user clicks "Synchronize galleries" in plugin settings
 local function synchronizeGalleries(propertyTable)
-  propertyTable.synchronizeGalleriesResult = LOC("$$$/PhotoDeck/SynchronizeStatus/InProgress=In progress^.")
+  propertyTable.synchronizeGalleriesResult = LOC("$$$/PhotoDeck/SynchronizeStatus/InProgress=In progress")
   propertyTable.canSynchronize = false
   local progressScope = LrProgressScope({
-    title = LOC("$$$/PhotoDeck/SynchronizeStatus/Title=Gallery synchronization^."),
-    caption = LOC("$$$/PhotoDeck/SynchronizeStatus/Starting=Starting^.") })
+    title = LOC("$$$/PhotoDeck/SynchronizeStatus/Title=Gallery synchronization"),
+    caption = LOC("$$$/PhotoDeck/SynchronizeStatus/Starting=Starting") })
   progressScope:setCancelable(true)
   LrTasks.startAsyncTask(function()
     PhotoDeckAPI.connect(propertyTable.apiKey, propertyTable.apiSecret, propertyTable.username, propertyTable.password)
