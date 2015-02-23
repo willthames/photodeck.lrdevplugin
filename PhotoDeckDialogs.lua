@@ -47,7 +47,7 @@ local function login(propertyTable)
       propertyTable.connectionStatus = LOC("$$$/PhotoDeck/ConnectionStatus/LoggedInAs=Logged in as ^1 ^2", result.firstname, result.lastname)
     end
     propertyTable.loggedin = PhotoDeckAPI.loggedin
-    
+
     if PhotoDeckAPI.loggedin then
       -- get available websites
       websites, error_msg = PhotoDeckAPI.websites()
@@ -56,24 +56,24 @@ local function login(propertyTable)
         propertyTable.loggedin = PhotoDeckAPI.loggedin
       else
         propertyTable.websites = websites
-	propertyTable.websiteChoices = {}
-	local websitesCount = 0
-	local firstWebsite = nil
-	local foundCurrent = false
+        propertyTable.websiteChoices = {}
+        local websitesCount = 0
+        local firstWebsite = nil
+        local foundCurrent = false
         for k, v in pairs(propertyTable.websites) do
-	  websitesCount = websitesCount + 1
+          websitesCount = websitesCount + 1
           if not firstWebsite then
-	    firstWebsite = k
+            firstWebsite = k
           end
-	  if k == propertyTable.websiteChosen then
-	    foundCurrent = true
-	  end
+          if k == propertyTable.websiteChosen then
+            foundCurrent = true
+          end
           table.insert(propertyTable.websiteChoices, { title = v.title .. " (" .. v.hostname .. ")", value = k })
         end
-	if not foundCurrent then
+        if not foundCurrent then
           -- automatically select first website
-	  propertyTable.websiteChosen = firstWebsite
-	end
+          propertyTable.websiteChosen = firstWebsite
+        end
         propertyTable.multipleWebsites = websitesCount > 1
         updateWebsiteName(propertyTable, nil, propertyTable.websiteChosen)
       end
@@ -216,8 +216,8 @@ function PhotoDeckDialogs.startDialog(propertyTable)
     propertyTable = PhotoDeckDialogs.updateApiKeyAndSecret(propertyTable)
   end
   if propertyTable.username and propertyTable.username ~= '' and
-     propertyTable.password and propertyTable.password ~= '' and
-     keysAreValid then
+    propertyTable.password and propertyTable.password ~= '' and
+    keysAreValid then
     login(propertyTable)
   else
     ping(propertyTable)
@@ -319,9 +319,9 @@ function PhotoDeckDialogs.sectionsForTopOfDialog(f, propertyTable)
       f:column {
         f:static_text {
           title = LrView.bind 'connectionStatus',
-	  font = '<system/small/bold>',
-	  width = 300,
-	  height_in_lines = 2
+          font = '<system/small/bold>',
+          width = 300,
+          height_in_lines = 2
         },
       },
     },
@@ -329,15 +329,15 @@ function PhotoDeckDialogs.sectionsForTopOfDialog(f, propertyTable)
     f:row {
       bind_to_object = propertyTable,
       f:column {
-	f:row {
+        f:row {
           f:static_text {
-	    visible = LrBinding.andAllKeys('loggedin'),
+            visible = LrBinding.andAllKeys('loggedin'),
             title = LOC "$$$/PhotoDeck/AccountDialog/Website=Website:",
             width = LrView.share "user_label_width",
             alignment = 'right'
           },
           f:static_text {
-	    visible = LrBinding.andAllKeys('loggedin'),
+            visible = LrBinding.andAllKeys('loggedin'),
             title = LrView.bind 'websiteName',
             width = 300,
           }
@@ -347,8 +347,8 @@ function PhotoDeckDialogs.sectionsForTopOfDialog(f, propertyTable)
       f:column {
         f:push_button {
           title = LOC "$$$/PhotoDeck/AccountDialog/WebsiteChangeAction=Change",
-	  visible = LrBinding.andAllKeys('loggedin'),
-	  enabled = LrBinding.andAllKeys('loggedin', 'multipleWebsites'),
+          visible = LrBinding.andAllKeys('loggedin'),
+          enabled = LrBinding.andAllKeys('loggedin', 'multipleWebsites'),
           action = function() propertyTable = chooseWebsite(propertyTable) end,
         },
       },
@@ -370,16 +370,16 @@ function PhotoDeckDialogs.sectionsForTopOfDialog(f, propertyTable)
       f:push_button {
         title = LOC "$$$/PhotoDeck/PublishOptionsDialog/SynchronizeGalleries/Action=Import PhotoDeck galleries",
         action = function()
-		   local result = LrDialogs.confirm(
-		     LOC "$$$/PhotoDeck/PublishOptionsDialog/SynchronizeGalleries/ConfirmTitle=This will mirror your existing PhotoDeck galleries in Lightroom.",
-		     LOC "$$$/PhotoDeck/PublishOptionsDialog/SynchronizeGalleries/ConfirmSubtitle=Gallery content is currently not imported.",
-		     LOC "$$$/PhotoDeck/PublishOptionsDialog/SynchronizeGalleries/ProceedAction=Proceed",
-		     LOC "$$$/PhotoDeck/PublishOptionsDialog/SynchronizeGalleries/CancelAction=Cancel")
-		   if result == "ok" then
-                     synchronizeGalleries(propertyTable)
-	           end
-	end,
-	enabled = LrBinding.andAllKeys('loggedin', 'canSynchronize'),
+          local result = LrDialogs.confirm(
+            LOC "$$$/PhotoDeck/PublishOptionsDialog/SynchronizeGalleries/ConfirmTitle=This will mirror your existing PhotoDeck galleries in Lightroom.",
+            LOC "$$$/PhotoDeck/PublishOptionsDialog/SynchronizeGalleries/ConfirmSubtitle=Gallery content is currently not imported.",
+            LOC "$$$/PhotoDeck/PublishOptionsDialog/SynchronizeGalleries/ProceedAction=Proceed",
+            LOC "$$$/PhotoDeck/PublishOptionsDialog/SynchronizeGalleries/CancelAction=Cancel")
+          if result == "ok" then
+            synchronizeGalleries(propertyTable)
+          end
+        end,
+        enabled = LrBinding.andAllKeys('loggedin', 'canSynchronize'),
       },
 
       f:static_text {
@@ -466,9 +466,9 @@ PhotoDeckDialogs.viewForCollectionSettings = function(f, publishSettings, info)
         if error_msg then
           publishSettings.connectionStatus = LOC("$$$/PhotoDeck/CollectionSettingsDialog/ConnectionStatus/GalleryFailed=Error reading gallery from PhotoDeck: ^1", error_msg)
         else
-	  info.collectionSettings.LR_liveName = gallery.name
-  	  info.collectionSettings.description = gallery.description
-	  info.collectionSettings.display_style = gallery.displaystyle
+          info.collectionSettings.LR_liveName = gallery.name
+          info.collectionSettings.description = gallery.description
+          info.collectionSettings.display_style = gallery.displaystyle
         end
       end
     end
@@ -503,8 +503,8 @@ PhotoDeckDialogs.viewForCollectionSettings = function(f, publishSettings, info)
       f:static_text {
         bind_to_object = publishSettings,
         title = LrView.bind 'connectionStatus',
-	font = '<system/small/bold>',
-	fill_horizontal = 1
+        font = '<system/small/bold>',
+        fill_horizontal = 1
       }
     },
     f:row {
@@ -528,7 +528,7 @@ PhotoDeckDialogs.viewForCollectionSettings = function(f, publishSettings, info)
         bind_to_object = info.collectionSettings,
         title = LrView.bind 'galleryDisplayStyleName',
         width_in_chars = 30,
-	fill_horizontal = 1
+        fill_horizontal = 1
       },
       f:push_button {
         bind_to_object = info.collectionSettings,

@@ -102,11 +102,11 @@ local function getPhotoDeckPhotoIdsStoredInCatalog(photo)
     end
     if pkv[1] then
       if pkv[2] then
-	key = pkv[1]
-	val = pkv[2]
+        key = pkv[1]
+        val = pkv[2]
       else
-	key = ''
-	val = pkv[1]
+        key = ''
+        val = pkv[1]
       end
     end
     if key then
@@ -170,7 +170,7 @@ function publishServiceProvider.processRenderedPhotos( functionContext, exportCo
     local collectionInfo = exportContext.publishedCollectionInfo
     local galleryId = collectionInfo.remoteId
     local galleryPhotos
-  
+
     if galleryId then
       gallery, error_msg = PhotoDeckAPI.gallery(urlname, galleryId)
       if error_msg then
@@ -179,7 +179,7 @@ function publishServiceProvider.processRenderedPhotos( functionContext, exportCo
         return
       end
     end
-  
+
     if not gallery then
       -- Create or update this gallery.
       if not collectionInfo.publishedCollection then
@@ -219,11 +219,11 @@ function publishServiceProvider.processRenderedPhotos( functionContext, exportCo
         -- previously published in another gallery?
         catalog:withReadAccessDo( function()
           local photoIds = getPhotoDeckPhotoIdsStoredInCatalog(photo)
-	  if isVirtualCopy then
+          if isVirtualCopy then
             photoId = photoIds[catalogKey]
           else
             photoId = photoIds[catalogKey] or photoIds['']
-	  end
+          end
         end)
       end
     end
@@ -239,64 +239,64 @@ function publishServiceProvider.processRenderedPhotos( functionContext, exportCo
 
         local photoAlreadyPublished = not not photoId
 
-	local upload
-	if not error_msg then
+        local upload
+        if not error_msg then
           -- Build list of photo attributes
           local photoAttributes = {}
-  
+
           if not photoAlreadyPublished or exportSettings.uploadOnRepublish then
             photoAttributes.contentPath = pathOrMessage
           end
           photoAttributes.publishToGallery = gallery.uuid
           photoAttributes.lrPhoto = photo
-  
+
           -- Upload or replace/update the photo.
           if photoAlreadyPublished then
             upload, error_msg = PhotoDeckAPI.updatePhoto(photoId, urlname, photoAttributes, true)
-	    if upload and upload.notfound then
-	      -- Not found error on PhotoDeck. Assume that the photo is gone and that we need to upload it again.
-	      photoAlreadyPublished = false
-	      photoAttributes.contentPath = pathOrMessage
-	    end
-	  end
+            if upload and upload.notfound then
+              -- Not found error on PhotoDeck. Assume that the photo is gone and that we need to upload it again.
+              photoAlreadyPublished = false
+              photoAttributes.contentPath = pathOrMessage
+            end
+          end
 
           if not photoAlreadyPublished then
             upload, error_msg = PhotoDeckAPI.uploadPhoto(urlname, photoAttributes)
           end
         end
 
-	if not error_msg and upload and upload.uuid and upload.uuid ~= "" then
-	  if isPublish then
+        if not error_msg and upload and upload.uuid and upload.uuid ~= "" then
+          if isPublish then
             rendition:recordPublishedPhotoId(upload.uuid)
 
-	    -- Also save the remote photo ID at the LrPhoto level, so that we can find it when publishing in a different gallery
-	    catalog:withWriteAccessDo( "publish", function( context )
+            -- Also save the remote photo ID at the LrPhoto level, so that we can find it when publishing in a different gallery
+            catalog:withWriteAccessDo( "publish", function( context )
               storePhotoDeckPhotoIdsInCatalog(photo, catalogKey, upload.uuid)
             end)
 
-	    -- Mark all instances of this Lightroom Photo within our published collections as being clean (not edited).
-	    -- E.g., when metadata have been changed, re-publishing from any of the published collection will update the PhotoDeck photo for all. No need to re-publish from each published collection.
-	    if photoAlreadyPublished then
+            -- Mark all instances of this Lightroom Photo within our published collections as being clean (not edited).
+            -- E.g., when metadata have been changed, re-publishing from any of the published collection will update the PhotoDeck photo for all. No need to re-publish from each published collection.
+            if photoAlreadyPublished then
               for _, publishedCollection in pairs(photo:getContainedPublishedCollections()) do
-	        if publishedCollection:getService().localIdentifier == exportContext.publishService.localIdentifier then
-		  for _, publishedPhotoCopy in pairs(publishedCollection:getPublishedPhotos()) do
-		    if publishedPhotoCopy:getPhoto().localIdentifier == photo.localIdentifier then
-		      catalog:withWriteAccessDo("Marking photo as clean", function( context )
-		        publishedPhotoCopy:setEditedFlag(false)
-		      end)
-		      break
-		    end
-		  end
-		end
-	      end
-	    end
+                if publishedCollection:getService().localIdentifier == exportContext.publishService.localIdentifier then
+                  for _, publishedPhotoCopy in pairs(publishedCollection:getPublishedPhotos()) do
+                    if publishedPhotoCopy:getPhoto().localIdentifier == photo.localIdentifier then
+                      catalog:withWriteAccessDo("Marking photo as clean", function( context )
+                        publishedPhotoCopy:setEditedFlag(false)
+                      end)
+                      break
+                    end
+                  end
+                end
+              end
+            end
           end
 
-	  -- Remember this in the list of photos we uploaded.
-	  uploadedPhotoIds[photo.localIdentifier] = upload.uuid
+          -- Remember this in the list of photos we uploaded.
+          uploadedPhotoIds[photo.localIdentifier] = upload.uuid
 
-	else
-	  rendition:uploadFailed(error_msg or LOC("$$$/PhotoDeck/ProcessRenderedPhotos/ErrorUploading=Upload failed"))
+        else
+          rendition:uploadFailed(error_msg or LOC("$$$/PhotoDeck/ProcessRenderedPhotos/ErrorUploading=Upload failed"))
         end
 
         -- When done with photo, delete temp file. There is a cleanup step that happens later,
@@ -328,25 +328,25 @@ publishServiceProvider.deletePhotosFromPublishedCollection = function(publishSet
     error_msg = nil
     if photoId ~= "" then
       local publishedPhoto = publishedPhotoById[photoId]
-  
+
       local collCount = 0
       for _, c in pairs(publishedPhoto:getPhoto():getContainedPublishedCollections()) do
         if c:getRemoteId() ~= galleryId then
           collCount = collCount + 1
         end
       end
-  
+
       if collCount == 0 then
         -- delete photo if this is the only collection it's in
         result, error_msg = PhotoDeckAPI.deletePhoto(photoId)
-  
+
         if error_msg then
           LrErrors.throwUserError(LOC("$$$/PhotoDeck/DeletePhotos/ErrorDeletingPhoto=Error deleting photo: ^1", error_msg))
         end
       else
         -- otherwise unpublish from the passed in collection
         result, error_msg = PhotoDeckAPI.unpublishPhoto(photoId, galleryId)
-  
+
         if error_msg then
           LrErrors.throwUserError(LOC("$$$/PhotoDeck/DeletePhotos/ErrorUnpublishingPhoto=Error unpublishing photo: ^1", error_msg))
         end
@@ -439,7 +439,7 @@ publishServiceProvider.goToPublishedPhoto = function( publishSettings, info )
       break
     end
   end
-  
+
   if publishedCollection then
     local galleryurl = publishedCollection:getRemoteUrl()
     if galleryurl and galleryurl ~= '' then

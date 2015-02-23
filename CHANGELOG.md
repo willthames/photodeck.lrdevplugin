@@ -1,3 +1,7 @@
+0.11.3 - 23/02/2015
+-------------------
+Tabs/indentation fixes
+
 0.11.2 - 06/02/2015
 -------------------
 Fix connection issues for non english systems
