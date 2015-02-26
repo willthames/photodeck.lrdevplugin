@@ -10,7 +10,8 @@ local PhotoDeckAPIXSLT = require 'PhotoDeckAPIXSLT'
 local logger = import 'LrLogger'( 'PhotoDeckPublishLightroomPlugin' )
 logger:enable('logfile')
 
-local urlprefix = 'http://api.photodeck.com'
+local PhotoDeckAPI_BASEURL = 'http://api.photodeck.com'
+local PhotoDeckMY_BASEURL = 'https://my.photodeck.com'
 
 local PhotoDeckAPI_KEY = ''
 local PhotoDeckAPI_SECRET = ''
@@ -162,7 +163,7 @@ function PhotoDeckAPI.request(method, uri, data, onerror)
   local headers = auth_headers(method, uri, querystring)
 
   -- build full url
-  local fullurl = urlprefix .. uri
+  local fullurl = PhotoDeckAPI_BASEURL .. uri
   if querystring and querystring ~= '' then
     fullurl = fullurl .. '?' .. querystring
   end
@@ -198,7 +199,7 @@ function PhotoDeckAPI.requestMultiPart(method, uri, content, onerror)
   -- set up authorisation headers
   local headers = auth_headers(method, uri)
   -- build full url
-  local fullurl = urlprefix .. uri
+  local fullurl = PhotoDeckAPI_BASEURL .. uri
 
   -- call API
   local result, resp_headers
@@ -312,6 +313,11 @@ function PhotoDeckAPI.gallery(urlname, galleryId)
   local result = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.gallery)
   -- logger:trace(printTable(result))
   return result, error_msg
+end
+
+function PhotoDeckAPI.openGalleryInBackend(galleryId)
+  logger:trace(string.format('PhotoDeckAPI.openGalleryInBackend("%s")', galleryId))
+  LrHttp.openUrlInBrowser(PhotoDeckMY_BASEURL .. '/medias/manage?gallery_id=' .. galleryId)
 end
 
 local function buildGalleryInfoFromLrCollectionInfo(collectionInfo)

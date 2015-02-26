@@ -27,6 +27,7 @@
 "$$$/PhotoDeck/InitialSynchronizationDialog/NoAction=Non"
 "$$$/PhotoDeck/WebsitesDialog/Title=Sites web PhotoDeck"
 "$$$/PhotoDeck/GalleryDisplayStylesDialog/Title=Styles d'affichage des galeries"
+"$$$/PhotoDeck/CollectionSettingsDialog/EditInPhotoDeckAction=Ouvrir dans PhotoDeck"
 "$$$/PhotoDeck/CollectionSettingsDialog/ChooseGalleryDisplayStyleAction=Changer le style"
 "$$$/PhotoDeck/CollectionSettingsDialog/Description=Introduction :"
 "$$$/PhotoDeck/CollectionSettingsDialog/GalleryDisplayStyle=Style de galerie :"
