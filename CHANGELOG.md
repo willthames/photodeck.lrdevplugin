@@ -1,3 +1,7 @@
+0.11.4 - 26/02/2015
+-------------------
+Fix LUA error when exporting
+
 0.11.3 - 23/02/2015
 -------------------
 Tabs/indentation fixes

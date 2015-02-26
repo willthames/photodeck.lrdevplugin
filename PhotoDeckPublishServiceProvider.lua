@@ -247,7 +247,9 @@ function publishServiceProvider.processRenderedPhotos( functionContext, exportCo
           if not photoAlreadyPublished or exportSettings.uploadOnRepublish then
             photoAttributes.contentPath = pathOrMessage
           end
-          photoAttributes.publishToGallery = gallery.uuid
+          if gallery then
+            photoAttributes.publishToGallery = gallery.uuid
+          end
           photoAttributes.lrPhoto = photo
 
           -- Upload or replace/update the photo.
