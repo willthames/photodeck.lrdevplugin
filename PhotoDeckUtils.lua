@@ -93,11 +93,11 @@ end
 -- parses datetimes formatted as 2015-02-05T21:30:38+01:00
 function PhotoDeckUtils.XMLDateTimeToCoca(s)
   local coca = nil
-  if s then
+  if s and s ~= '' then
     local year, month, day = string.match(s, '([12][0-9][0-9][0-9])-([0-1][0-9])-([0-3][0-9])')
-    year = tonumber(year)
-    month = tonumber(month)
-    day = tonumber(day)
+    year = tonumber(year) or 0
+    month = tonumber(month) or 0
+    day = tonumber(day) or 0
     if year >= 1000 and month >= 1 and day >= 1 then
       local hour, min, sec = string.match(s, 'T([0-2][0-9]):([0-6][0-9]):([0-6][0-9])')
       hour = tonumber(hour) or 0
