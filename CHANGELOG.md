@@ -1,4 +1,43 @@
-0.9 - 15/01/2014
+0.11.5 - 26/02/2015
+-------------------
+Fix URL encoding of % character
+
+0.11.4 - 26/02/2015
+-------------------
+Fix LUA error when exporting
+
+0.11.3 - 23/02/2015
+-------------------
+Tabs/indentation fixes
+
+0.11.2 - 06/02/2015
+-------------------
+Fix connection issues for non english systems
+Minor fixes
+
+
+0.11 - 05/02/2015
+-----------------
+Multiple accounts fixes
+Virtual copies support
+Always show current gallery description and display styles in gallery/folder settings
+Usability improvements for first time users
+PhotoDeck galleries structure synchronization gets a proper cancelable progress bar
+Minor performance improvements
+Minor fixes
+Code reorganisation
+
+0.10 - 03/02/2015
+-----------------
+Improved robustness and performance
+Lightroom -> PhotoDeck photo metadata synchronization
+Republishing will not reupload image again by default (see plugin settings)
+PhotoDeck galleries structure synchronization
+Plugin can be used in export only mode
+French translations
+Minor fixes
+
+0.9 - 15/01/2015
 ----------------
 Don't replace photos with identical file names at upload
 Fix root gallery discovery when root gallery is not named "Galleries"

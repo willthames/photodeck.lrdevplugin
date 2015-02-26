@@ -1,3 +1,7 @@
 KEY
 SECRET
-*.txt
+*~
+*.swp
+*.swo
+*.swn
+*.DS_Store
