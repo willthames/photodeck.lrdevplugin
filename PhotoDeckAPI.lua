@@ -60,8 +60,8 @@ local function auth_headers(method, uri, querystring)
 end
 
 -- extra chars from http://tools.ietf.org/html/rfc3986#section-2.2
-local function urlencode (s)
-  s = string.gsub(s, "([][:/?#@!#'()*,;&=+%c])", function (c)
+local function urlencode(s)
+  s = string.gsub(s, "([][:/?#@!#'()*,;&=+%%%c])", function (c)
     return string.format("%%%02X", string.byte(c))
   end)
   s = string.gsub(s, " ", "+")

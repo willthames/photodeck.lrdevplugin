@@ -1,3 +1,7 @@
+0.11.5 - 26/02/2015
+-------------------
+Fix URL encoding of % character
+
 0.11.4 - 26/02/2015
 -------------------
 Fix LUA error when exporting
