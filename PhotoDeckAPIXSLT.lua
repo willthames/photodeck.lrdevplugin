@@ -56,6 +56,9 @@ return t
 
 PhotoDeckAPIXSLT.galleries = xsltheader .. [=====[
   <xsl:template match='/reply/galleries'>
+LrDate = import 'LrDate'
+local PhotoDeckUtils = require 'PhotoDeckUtils'
+
 local t = {}
     <xsl:for-each select='gallery'>
 t["<xsl:value-of select='uuid'/>"] = {
@@ -65,6 +68,7 @@ t["<xsl:value-of select='uuid'/>"] = {
      description = [====[<xsl:value-of select='description'/>]====],
      urlpath = "<xsl:value-of select='url-path'/>",
      parentuuid = "<xsl:value-of select='parent-uuid'/>",
+     publishedat = PhotoDeckUtils.XMLDateTimeToCoca("<xsl:value-of select='published-at'/>"),
      mediascount = "<xsl:value-of select='medias-count'/>",
      displaystyle = "<xsl:value-of select='gallery-display-style-uuid'/>",
 }
@@ -75,6 +79,9 @@ return t
 
 PhotoDeckAPIXSLT.gallery = xsltheader .. [=====[
   <xsl:template match='/reply/gallery'>
+LrDate = import 'LrDate'
+local PhotoDeckUtils = require 'PhotoDeckUtils'
+
 local t = {
      fullurlpath = "<xsl:value-of select='full-url-path'/>",
      name = [====[<xsl:value-of select='name'/>]====],
@@ -82,6 +89,7 @@ local t = {
      description = [====[<xsl:value-of select='description'/>]====],
      urlpath = "<xsl:value-of select='url-path'/>",
      parentuuid = "<xsl:value-of select='parent-uuid'/>",
+     publishedat = PhotoDeckUtils.XMLDateTimeToCoca("<xsl:value-of select='published-at'/>"),
      displaystyle = "<xsl:value-of select='gallery-display-style-uuid'/>",
 }
 return t
