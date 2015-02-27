@@ -13,6 +13,8 @@ logger:enable('logfile')
 local PhotoDeckAPI_BASEURL = 'http://api.photodeck.com'
 local PhotoDeckMY_BASEURL = 'https://my.photodeck.com'
 
+local PhotoDeckAPI_SESSIONCOOKIE = '_ficelle_session'
+
 local PhotoDeckAPI_KEY = ''
 local PhotoDeckAPI_SECRET = ''
 
@@ -25,6 +27,7 @@ local PhotoDeckAPI = {
   secret = '',
   password = '',
   loggedin = false,
+  sessionCookie = nil,
   canSynchronize = true
 }
 
@@ -51,12 +54,21 @@ end
 local function auth_headers(method, uri, querystring)
   -- sign request
   local headers = sign(method, uri, querystring)
+
   -- set login cookies
   if PhotoDeckAPI.username and PhotoDeckAPI.password and not PhotoDeckAPI.loggedin then
+    -- not logged in, send HTTP Basic credentials
     local authorization = 'Basic ' .. LrStringUtils.encodeBase64(PhotoDeckAPI.username ..
       ':' .. PhotoDeckAPI.password)
-    table.insert(headers, { field = 'Authorization',  value=authorization })
+    table.insert(headers, { field = 'Authorization',  value = authorization })
+
+  elseif PhotoDeckAPI.sessionCookie then
+    -- already logged in, inject last known session cookie.
+    -- NOTE: Lightroom usually does this by itself, but some installations seems to loose cookies between calls. So we are doing this manually.
+    local cookie = PhotoDeckAPI_SESSIONCOOKIE .. '=' .. PhotoDeckAPI.sessionCookie
+    table.insert(headers, { field = 'Cookie',  value = cookie })
   end
+
   return headers
 end
 
@@ -136,11 +148,20 @@ local function handle_response(seq, response, resp_headers, onerror)
     --end
     if status_code == "401" or status_code == "999" then
       PhotoDeckAPI.loggedin = false
+      PhotoDeckAPI.sessionCookie = nil
     end
     logger:error(string.format(' %s <- %s [%s]: %s', seq, status_code, request_id, error_msg))
   else
     PhotoDeckAPI.loggedin = true
     logger:trace(string.format(' %s <- %s [%s]', seq, status_code, request_id))
+
+    -- Try to extract session cookie. We will reinject it later, as it seems that some Lightroom installations loose cookies between calls.
+    for _, set_cookie in ipairs(PhotoDeckUtils.filter(resp_headers, function(v) return isTable(v) and v.field == 'Set-Cookie' end)) do
+      local parsed_cookies = LrHttp.parseCookie(set_cookie.value, false)
+      if parsed_cookies[PhotoDeckAPI_SESSIONCOOKIE] then
+        PhotoDeckAPI.sessionCookie = parsed_cookies[PhotoDeckAPI_SESSIONCOOKIE]
+      end
+    end
   end
 
   return response, error_msg
@@ -228,6 +249,7 @@ function PhotoDeckAPI.connect(key, secret, username, password)
   PhotoDeckAPI.username = username
   PhotoDeckAPI.password = password
   PhotoDeckAPI.loggedin = false
+  PhotoDeckAPI.sessionCookie = nil
 end
 
 function PhotoDeckAPI.ping(text)
@@ -253,6 +275,7 @@ function PhotoDeckAPI.whoami()
   local result = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.whoami)
   if not result or not result.email or result.email == '' then
     PhotoDeckAPI.loggedin = false
+    PhotoDeckAPI.sessionCookie = nil
   end
   -- logger:trace(printTable(result))
   return result, error_msg
@@ -277,6 +300,7 @@ function PhotoDeckAPI.websites()
     end
     if error_msg then
       PhotoDeckAPI.loggedin = false
+      PhotoDeckAPI.sessionCookie = nil
     else
       PhotoDeckAPICache[cacheKey] = result
     end
