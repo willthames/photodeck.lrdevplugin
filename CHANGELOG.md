@@ -1,3 +1,8 @@
+0.12.0 - 02/03/2015
+-------------------
+Add a button in gallery/folder settings to open PhotoDeck admin space
+Try to deal with Lightroom installations that looses their cookies between each API call
+
 0.11.5 - 26/02/2015
 -------------------
 Fix URL encoding of % character
