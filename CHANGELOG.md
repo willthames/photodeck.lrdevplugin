@@ -1,3 +1,7 @@
+0.13.0 - 16/06/2015
+-------------------
+Deal with API requests rate limits
+
 0.12.0 - 02/03/2015
 -------------------
 Add a button in gallery/folder settings to open PhotoDeck admin space

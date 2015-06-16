@@ -4,6 +4,7 @@ local LrFileUtils = import 'LrFileUtils'
 local LrHttp = import 'LrHttp'
 local LrStringUtils = import 'LrStringUtils'
 local LrXml = import 'LrXml'
+local LrTasks = import 'LrTasks'
 local PhotoDeckUtils = require 'PhotoDeckUtils'
 local PhotoDeckAPIXSLT = require 'PhotoDeckAPIXSLT'
 
@@ -93,6 +94,36 @@ local function table_to_querystring(data)
   return string.sub(s, 2)     -- remove first `&'
 end
 
+-- Makes sure that we don't call the API more than once every second starting from the 5th request in a row.
+-- This is done to avoid hitting rate limits on the PhotoeDeck API and throwing errors
+local resume_requests_at = 0
+local last_request_at = 0
+local consecutive_requests = 0
+local function throttle_request()
+  local now = LrDate.currentTime()
+  local sleep_for = resume_requests_at - now
+  if sleep_for > 0 then
+    logger:trace(string.format('       ** Sleeping for %.2f seconds as we have previously hit a rate limit', sleep_for))
+    LrTasks.sleep(sleep_for)
+    now = LrDate.currentTime()
+  end
+  resume_requests_at = 0
+
+  local elapsed = now - last_request_at
+  if elapsed < 30 then
+    consecutive_requests = consecutive_requests + 1
+    if consecutive_requests > 4 and elapsed < 1 then
+      sleep_for = 1 - elapsed
+      logger:trace(string.format('       ** Sleeping for %.2f seconds to keep request rate at 1/sec max', sleep_for))
+      LrTasks.sleep(sleep_for)
+      now = LrDate.currentTime()
+    end
+  else
+    consecutive_requests = 1
+  end
+  last_request_at = now
+end
+
 local function handle_response(seq, response, resp_headers, onerror)
   local status = PhotoDeckUtils.filter(resp_headers, function(v) return isTable(v) and v.field == 'Status' end)[1]
   local request_id = PhotoDeckUtils.filter(resp_headers, function(v) return isTable(v) and v.field == 'X-Request-Id' end)[1]
@@ -118,6 +149,11 @@ local function handle_response(seq, response, resp_headers, onerror)
     if status then
       -- Get error from Status header
       error_msg = status.value
+      if status_code == "429" then
+        -- Too Many Requests. Wait 30 seconds until next request.
+        -- Note: this HTTP error seems to be filtered out on LR/Windows at a lower level (the error will get catched in the status_code = "999" case)
+        resume_requests_at = LrDate.currentTime() + 30
+      end
     else
       -- Generic HTTP error
       if status_code == "999" then
@@ -129,6 +165,8 @@ local function handle_response(seq, response, resp_headers, onerror)
 
     if not response and status_code == "999" then
       error_msg = LOC("$$$/PhotoDeck/API/NoResponse=No response from network")
+      -- No network connection, or we are blocked. Wait 30 seconds until next request.
+      resume_requests_at = LrDate.currentTime() + 30
     end
 
     local error_msg_from_xml = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.error)
@@ -190,6 +228,7 @@ function PhotoDeckAPI.request(method, uri, data, onerror)
   end
 
   -- call API
+  throttle_request()
   local result, resp_headers
   local seq = string.format("%5i", math.random(99999))
   if method == 'GET' then
@@ -223,6 +262,7 @@ function PhotoDeckAPI.requestMultiPart(method, uri, content, onerror)
   local fullurl = PhotoDeckAPI_BASEURL .. uri
 
   -- call API
+  throttle_request()
   local result, resp_headers
   result, resp_headers = LrHttp.postMultipart(fullurl, content, headers)
 
