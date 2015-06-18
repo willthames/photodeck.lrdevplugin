@@ -1110,6 +1110,17 @@ function PhotoDeckAPI.deletePhoto(photoId)
   return response, error_msg
 end
 
+function PhotoDeckAPI.deletePhotos(photoIds)
+  logger:trace(string.format('PhotoDeckAPI.deletePhotos(<photo ids)'))
+  local url = '/medias/batch_update.xml'
+  local content = { { name = 'medias[on]', value = 'medias' },
+                    { name = 'medias[medias]', value = table.concat(photoIds, ',') },
+                    { name = 'medias[delete]', value = '1' } }
+  local response, error_msg = PhotoDeckAPI.requestMultiPart('PUT', url, content)
+  --logger:trace('PhotoDeckAPI.deletePhotos: ' .. response)
+  return response, error_msg
+end
+
 function PhotoDeckAPI.unpublishPhoto(photoId, galleryId)
   logger:trace(string.format('PhotoDeckAPI.unpublishPhoto("%s", "%s")', photoId, galleryId))
   local url = '/medias/' .. photoId .. '.xml'
@@ -1118,6 +1129,17 @@ function PhotoDeckAPI.unpublishPhoto(photoId, galleryId)
   onerror["404"] = function() return nil end
   local response, error_msg = PhotoDeckAPI.requestMultiPart('PUT', url, content, onerror)
   --logger:trace('PhotoDeckAPI.unpublishPhoto: ' .. response)
+  return response, error_msg
+end
+
+function PhotoDeckAPI.unpublishPhotos(photoIds, galleryId)
+  logger:trace(string.format('PhotoDeckAPI.unpublishPhotos(<photo ids>, "%s")', galleryId))
+  local url = '/medias/batch_update.xml'
+  local content = { { name = 'medias[on]', value = 'medias' },
+                    { name = 'medias[medias]', value = table.concat(photoIds, ',') },
+                    { name = 'medias[unpublish_from_galleries]', value = galleryId } }
+  local response, error_msg = PhotoDeckAPI.requestMultiPart('PUT', url, content)
+  --logger:trace('PhotoDeckAPI.unpublishPhotos: ' .. response)
   return response, error_msg
 end
 
