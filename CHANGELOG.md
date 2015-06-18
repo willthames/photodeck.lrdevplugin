@@ -1,3 +1,8 @@
+0.14.0 - 18/06/2015
+-------------------
+Use https
+Optimize unpublish operation for many photos
+
 0.13.0 - 16/06/2015
 -------------------
 Deal with API requests rate limits
