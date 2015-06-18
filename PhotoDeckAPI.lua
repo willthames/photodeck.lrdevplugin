@@ -11,7 +11,7 @@ local PhotoDeckAPIXSLT = require 'PhotoDeckAPIXSLT'
 local logger = import 'LrLogger'( 'PhotoDeckPublishLightroomPlugin' )
 logger:enable('logfile')
 
-local PhotoDeckAPI_BASEURL = 'http://api.photodeck.com'
+local PhotoDeckAPI_BASEURL = 'https://api.photodeck.com'
 local PhotoDeckMY_BASEURL = 'https://my.photodeck.com'
 
 local PhotoDeckAPI_SESSIONCOOKIE = '_ficelle_session'
