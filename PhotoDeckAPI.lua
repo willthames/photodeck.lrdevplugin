@@ -4,13 +4,17 @@ local LrFileUtils = import 'LrFileUtils'
 local LrHttp = import 'LrHttp'
 local LrStringUtils = import 'LrStringUtils'
 local LrXml = import 'LrXml'
+local LrTasks = import 'LrTasks'
 local PhotoDeckUtils = require 'PhotoDeckUtils'
 local PhotoDeckAPIXSLT = require 'PhotoDeckAPIXSLT'
 
 local logger = import 'LrLogger'( 'PhotoDeckPublishLightroomPlugin' )
 logger:enable('logfile')
 
-local urlprefix = 'http://api.photodeck.com'
+local PhotoDeckAPI_BASEURL = 'https://api.photodeck.com'
+local PhotoDeckMY_BASEURL = 'https://my.photodeck.com'
+
+local PhotoDeckAPI_SESSIONCOOKIE = '_ficelle_session'
 
 local PhotoDeckAPI_KEY = ''
 local PhotoDeckAPI_SECRET = ''
@@ -24,6 +28,7 @@ local PhotoDeckAPI = {
   secret = '',
   password = '',
   loggedin = false,
+  sessionCookie = nil,
   canSynchronize = true
 }
 
@@ -50,12 +55,21 @@ end
 local function auth_headers(method, uri, querystring)
   -- sign request
   local headers = sign(method, uri, querystring)
+
   -- set login cookies
   if PhotoDeckAPI.username and PhotoDeckAPI.password and not PhotoDeckAPI.loggedin then
+    -- not logged in, send HTTP Basic credentials
     local authorization = 'Basic ' .. LrStringUtils.encodeBase64(PhotoDeckAPI.username ..
       ':' .. PhotoDeckAPI.password)
-    table.insert(headers, { field = 'Authorization',  value=authorization })
+    table.insert(headers, { field = 'Authorization',  value = authorization })
+
+  elseif PhotoDeckAPI.sessionCookie then
+    -- already logged in, inject last known session cookie.
+    -- NOTE: Lightroom usually does this by itself, but some installations seems to loose cookies between calls. So we are doing this manually.
+    local cookie = PhotoDeckAPI_SESSIONCOOKIE .. '=' .. PhotoDeckAPI.sessionCookie
+    table.insert(headers, { field = 'Cookie',  value = cookie })
   end
+
   return headers
 end
 
@@ -78,6 +92,36 @@ local function table_to_querystring(data)
     s = s .. "&" .. urlencode(k) .. "=" .. urlencode(v)
   end
   return string.sub(s, 2)     -- remove first `&'
+end
+
+-- Makes sure that we don't call the API more than once every second starting from the 5th request in a row.
+-- This is done to avoid hitting rate limits on the PhotoeDeck API and throwing errors
+local resume_requests_at = 0
+local last_request_at = 0
+local consecutive_requests = 0
+local function throttle_request()
+  local now = LrDate.currentTime()
+  local sleep_for = resume_requests_at - now
+  if sleep_for > 0 then
+    logger:trace(string.format('       ** Sleeping for %.2f seconds as we have previously hit a rate limit', sleep_for))
+    LrTasks.sleep(sleep_for)
+    now = LrDate.currentTime()
+  end
+  resume_requests_at = 0
+
+  local elapsed = now - last_request_at
+  if elapsed < 30 then
+    consecutive_requests = consecutive_requests + 1
+    if consecutive_requests > 4 and elapsed < 1 then
+      sleep_for = 1 - elapsed
+      logger:trace(string.format('       ** Sleeping for %.2f seconds to keep request rate at 1/sec max', sleep_for))
+      LrTasks.sleep(sleep_for)
+      now = LrDate.currentTime()
+    end
+  else
+    consecutive_requests = 1
+  end
+  last_request_at = now
 end
 
 local function handle_response(seq, response, resp_headers, onerror)
@@ -105,6 +149,11 @@ local function handle_response(seq, response, resp_headers, onerror)
     if status then
       -- Get error from Status header
       error_msg = status.value
+      if status_code == "429" then
+        -- Too Many Requests. Wait 30 seconds until next request.
+        -- Note: this HTTP error seems to be filtered out on LR/Windows at a lower level (the error will get catched in the status_code = "999" case)
+        resume_requests_at = LrDate.currentTime() + 30
+      end
     else
       -- Generic HTTP error
       if status_code == "999" then
@@ -116,6 +165,8 @@ local function handle_response(seq, response, resp_headers, onerror)
 
     if not response and status_code == "999" then
       error_msg = LOC("$$$/PhotoDeck/API/NoResponse=No response from network")
+      -- No network connection, or we are blocked. Wait 30 seconds until next request.
+      resume_requests_at = LrDate.currentTime() + 30
     end
 
     local error_msg_from_xml = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.error)
@@ -135,11 +186,20 @@ local function handle_response(seq, response, resp_headers, onerror)
     --end
     if status_code == "401" or status_code == "999" then
       PhotoDeckAPI.loggedin = false
+      PhotoDeckAPI.sessionCookie = nil
     end
     logger:error(string.format(' %s <- %s [%s]: %s', seq, status_code, request_id, error_msg))
   else
     PhotoDeckAPI.loggedin = true
     logger:trace(string.format(' %s <- %s [%s]', seq, status_code, request_id))
+
+    -- Try to extract session cookie. We will reinject it later, as it seems that some Lightroom installations loose cookies between calls.
+    for _, set_cookie in ipairs(PhotoDeckUtils.filter(resp_headers, function(v) return isTable(v) and v.field == 'Set-Cookie' end)) do
+      local parsed_cookies = LrHttp.parseCookie(set_cookie.value, false)
+      if parsed_cookies[PhotoDeckAPI_SESSIONCOOKIE] then
+        PhotoDeckAPI.sessionCookie = parsed_cookies[PhotoDeckAPI_SESSIONCOOKIE]
+      end
+    end
   end
 
   return response, error_msg
@@ -162,12 +222,13 @@ function PhotoDeckAPI.request(method, uri, data, onerror)
   local headers = auth_headers(method, uri, querystring)
 
   -- build full url
-  local fullurl = urlprefix .. uri
+  local fullurl = PhotoDeckAPI_BASEURL .. uri
   if querystring and querystring ~= '' then
     fullurl = fullurl .. '?' .. querystring
   end
 
   -- call API
+  throttle_request()
   local result, resp_headers
   local seq = string.format("%5i", math.random(99999))
   if method == 'GET' then
@@ -198,9 +259,10 @@ function PhotoDeckAPI.requestMultiPart(method, uri, content, onerror)
   -- set up authorisation headers
   local headers = auth_headers(method, uri)
   -- build full url
-  local fullurl = urlprefix .. uri
+  local fullurl = PhotoDeckAPI_BASEURL .. uri
 
   -- call API
+  throttle_request()
   local result, resp_headers
   result, resp_headers = LrHttp.postMultipart(fullurl, content, headers)
 
@@ -227,6 +289,7 @@ function PhotoDeckAPI.connect(key, secret, username, password)
   PhotoDeckAPI.username = username
   PhotoDeckAPI.password = password
   PhotoDeckAPI.loggedin = false
+  PhotoDeckAPI.sessionCookie = nil
 end
 
 function PhotoDeckAPI.ping(text)
@@ -252,6 +315,7 @@ function PhotoDeckAPI.whoami()
   local result = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.whoami)
   if not result or not result.email or result.email == '' then
     PhotoDeckAPI.loggedin = false
+    PhotoDeckAPI.sessionCookie = nil
   end
   -- logger:trace(printTable(result))
   return result, error_msg
@@ -276,6 +340,7 @@ function PhotoDeckAPI.websites()
     end
     if error_msg then
       PhotoDeckAPI.loggedin = false
+      PhotoDeckAPI.sessionCookie = nil
     else
       PhotoDeckAPICache[cacheKey] = result
     end
@@ -312,6 +377,11 @@ function PhotoDeckAPI.gallery(urlname, galleryId)
   local result = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.gallery)
   -- logger:trace(printTable(result))
   return result, error_msg
+end
+
+function PhotoDeckAPI.openGalleryInBackend(galleryId)
+  logger:trace(string.format('PhotoDeckAPI.openGalleryInBackend("%s")', galleryId))
+  LrHttp.openUrlInBrowser(PhotoDeckMY_BASEURL .. '/medias/manage?gallery_id=' .. galleryId)
 end
 
 local function buildGalleryInfoFromLrCollectionInfo(collectionInfo)
@@ -1040,6 +1110,17 @@ function PhotoDeckAPI.deletePhoto(photoId)
   return response, error_msg
 end
 
+function PhotoDeckAPI.deletePhotos(photoIds)
+  logger:trace(string.format('PhotoDeckAPI.deletePhotos(<photo ids)'))
+  local url = '/medias/batch_update.xml'
+  local content = { { name = 'medias[on]', value = 'medias' },
+                    { name = 'medias[medias]', value = table.concat(photoIds, ',') },
+                    { name = 'medias[delete]', value = '1' } }
+  local response, error_msg = PhotoDeckAPI.requestMultiPart('PUT', url, content)
+  --logger:trace('PhotoDeckAPI.deletePhotos: ' .. response)
+  return response, error_msg
+end
+
 function PhotoDeckAPI.unpublishPhoto(photoId, galleryId)
   logger:trace(string.format('PhotoDeckAPI.unpublishPhoto("%s", "%s")', photoId, galleryId))
   local url = '/medias/' .. photoId .. '.xml'
@@ -1048,6 +1129,17 @@ function PhotoDeckAPI.unpublishPhoto(photoId, galleryId)
   onerror["404"] = function() return nil end
   local response, error_msg = PhotoDeckAPI.requestMultiPart('PUT', url, content, onerror)
   --logger:trace('PhotoDeckAPI.unpublishPhoto: ' .. response)
+  return response, error_msg
+end
+
+function PhotoDeckAPI.unpublishPhotos(photoIds, galleryId)
+  logger:trace(string.format('PhotoDeckAPI.unpublishPhotos(<photo ids>, "%s")', galleryId))
+  local url = '/medias/batch_update.xml'
+  local content = { { name = 'medias[on]', value = 'medias' },
+                    { name = 'medias[medias]', value = table.concat(photoIds, ',') },
+                    { name = 'medias[unpublish_from_galleries]', value = galleryId } }
+  local response, error_msg = PhotoDeckAPI.requestMultiPart('PUT', url, content)
+  --logger:trace('PhotoDeckAPI.unpublishPhotos: ' .. response)
   return response, error_msg
 end
 

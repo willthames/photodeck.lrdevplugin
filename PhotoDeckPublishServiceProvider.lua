@@ -320,6 +320,10 @@ publishServiceProvider.deletePhotosFromPublishedCollection = function(publishSet
   local catalog = LrApplication.activeCatalog()
   local collection = catalog:getPublishedCollectionByLocalIdentifier(localCollectionId)
   local galleryId = collection:getRemoteId()
+  local photoIdsToDelete = {}
+  local photoIdsToUnpublish = {}
+  local result
+  local error_msg
   -- this next bit is stupid. Why is there no catalog:getPhotoByRemoteId or similar
   local publishedPhotos = collection:getPublishedPhotos()
   local publishedPhotoById = {}
@@ -340,23 +344,61 @@ publishServiceProvider.deletePhotosFromPublishedCollection = function(publishSet
 
       if collCount == 0 then
         -- delete photo if this is the only collection it's in
-        result, error_msg = PhotoDeckAPI.deletePhoto(photoId)
-
-        if error_msg then
-          LrErrors.throwUserError(LOC("$$$/PhotoDeck/DeletePhotos/ErrorDeletingPhoto=Error deleting photo: ^1", error_msg))
-        end
+        table.insert(photoIdsToDelete, photoId)
       else
         -- otherwise unpublish from the passed in collection
-        result, error_msg = PhotoDeckAPI.unpublishPhoto(photoId, galleryId)
-
-        if error_msg then
-          LrErrors.throwUserError(LOC("$$$/PhotoDeck/DeletePhotos/ErrorUnpublishingPhoto=Error unpublishing photo: ^1", error_msg))
-        end
+        table.insert(photoIdsToUnpublish, photoId)
       end
     end
+  end
 
-    if not error_msg then
+  -- Unpublish
+  local photoIdsToUnpublishCount = #photoIdsToUnpublish
+  if photoIdsToUnpublishCount == 1 then
+    -- Only one photo needs to be unpublished. Use non batched API endpoint.
+    local photoId = photoIdsToUnpublish[1]
+    result, error_msg = PhotoDeckAPI.unpublishPhoto(photoId, galleryId)
+
+    if error_msg then
+      LrErrors.throwUserError(LOC("$$$/PhotoDeck/DeletePhotos/ErrorUnpublishingPhoto=Error unpublishing photo: ^1", error_msg))
+    else
       deletedCallback(photoId)
+    end
+  elseif photoIdsToUnpublishCount > 0 then
+    -- More than one photo needs to be unpublished. Use batched API endpoint.
+    result, error_msg = PhotoDeckAPI.unpublishPhotos(photoIdsToUnpublish, galleryId)
+
+    if error_msg then
+      LrErrors.throwUserError(LOC("$$$/PhotoDeck/DeletePhotos/ErrorUnpublishingPhotos=Error unpublishing photos: ^1", error_msg))
+    else
+      for _, photoId in ipairs(photoIdsToUnpublish) do
+        deletedCallback(photoId)
+      end
+    end
+  end
+
+  -- Delete
+  local photoIdsToDeleteCount = #photoIdsToDelete
+  if photoIdsToDeleteCount == 1 then
+    -- Only one photo needs to be deleted. Use non batched API endpoint.
+    local photoId = photoIdsToDelete[1]
+    result, error_msg = PhotoDeckAPI.deletePhoto(photoId)
+
+    if error_msg then
+      LrErrors.throwUserError(LOC("$$$/PhotoDeck/DeletePhotos/ErrorDeletingPhoto=Error deleting photo: ^1", error_msg))
+    else
+      deletedCallback(photoId)
+    end
+  elseif photoIdsToDeleteCount > 0 then
+    -- More than one photo needs to be deleted. Use batched API endpoint.
+    result, error_msg = PhotoDeckAPI.deletePhotos(photoIdsToDelete)
+
+    if error_msg then
+      LrErrors.throwUserError(LOC("$$$/PhotoDeck/DeletePhotos/ErrorDeletingPhotos=Error deleting photos: ^1", error_msg))
+    else
+      for _, photoId in ipairs(photoIdsToDelete) do
+        deletedCallback(photoId)
+      end
     end
   end
 end

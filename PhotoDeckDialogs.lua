@@ -449,17 +449,25 @@ end
 PhotoDeckDialogs.viewForCollectionSettings = function(f, publishSettings, info)
   info.collectionSettings:addObserver('display_style', onGalleryDisplayStyleSelect)
 
+  local publishedCollection = info.publishedCollection
+  local galleryId
+  if publishedCollection then
+    galleryId = publishedCollection:getRemoteId()
+    if galleryId == '' then
+      galleryId = nil
+    end
+  end
   info.collectionSettings.galleryDisplayStyles = {}
 
+  publishSettings.currentGalleryId = galleryId
   publishSettings.connectionStatus = LOC "$$$/PhotoDeck/CollectionSettingsDialog/ConnectionStatus/Connecting=Connecting to PhotoDeck^."
+
   LrTasks.startAsyncTask(function()
     PhotoDeckAPI.connect(publishSettings.apiKey, publishSettings.apiSecret, publishSettings.username, publishSettings.password)
     local error_msg = nil
 
-    local publishedCollection = info.publishedCollection
     if publishedCollection then
-      local galleryId = publishedCollection:getRemoteId()
-      if galleryId and galleryID ~= '' then
+      if galleryId then
         -- read current live settings
         local gallery
         gallery, error_msg = PhotoDeckAPI.gallery(publishSettings.websiteChosen, galleryId)
@@ -505,6 +513,12 @@ PhotoDeckDialogs.viewForCollectionSettings = function(f, publishSettings, info)
         title = LrView.bind 'connectionStatus',
         font = '<system/small/bold>',
         fill_horizontal = 1
+      },
+      f:push_button {
+        bind_to_object = publishSettings,
+        action = function() PhotoDeckAPI.openGalleryInBackend(publishSettings.currentGalleryId) end,
+        visible = LrBinding.keyIsNotNil 'currentGalleryId',
+        title = LOC("$$$/PhotoDeck/CollectionSettingsDialog/EditInPhotoDeckAction=Open in PhotoDeck"),
       }
     },
     f:row {
