@@ -114,9 +114,6 @@ local function getPhotoDeckPhotoIdsStoredInCatalog(photo)
     end
   end
 
-  for k,v in pairs(res) do
-  end
-
   return res
 end
 
@@ -195,7 +192,6 @@ function publishServiceProvider.processRenderedPhotos( functionContext, exportCo
   end
 
   -- Iterate through photo renditions.
-  local uploadedPhotoIds = {}
   for i, rendition in exportContext:renditions { stopIfCanceled = true } do
     -- Update progress scope.
     progressScope:setPortionComplete( ( i - 1 ) / nPhotos )
@@ -207,7 +203,6 @@ function publishServiceProvider.processRenderedPhotos( functionContext, exportCo
 
     -- See if we previously uploaded this photo.
     if isPublish then
-      photoId = rendition.publishedPhotoId or uploadedPhotoIds[photo.localIdentifier]
       local isVirtualCopy = photo:getRawMetadata('isVirtualCopy')
       if isVirtualCopy then
         -- virtual copy shares the same metadata catalog entries it seems, so we use a different key to store the PhotoDeck ID
@@ -215,17 +210,17 @@ function publishServiceProvider.processRenderedPhotos( functionContext, exportCo
       else
         catalogKey = websiteuuid
       end
-      if not photoId then
-        -- previously published in another gallery?
-        catalog:withReadAccessDo( function()
-          local photoIds = getPhotoDeckPhotoIdsStoredInCatalog(photo)
-          if isVirtualCopy then
-            photoId = photoIds[catalogKey]
-          else
-            photoId = photoIds[catalogKey] or photoIds['']
-          end
-        end)
-      end
+
+      -- get photo ID from previous upload (either in this gallery or another one)
+      -- NOTE: we are using rendition.publishedPhotoId only as a last resort, as the photo might have seen it's UUID change in another gallery (e.g., following a manual deletion directly within PhotoDeck, followed by a publication in another gallery) -- rendition.publishedPhotoId might thus be outdated
+      catalog:withReadAccessDo( function()
+        local photoIds = getPhotoDeckPhotoIdsStoredInCatalog(photo)
+        if isVirtualCopy then
+          photoId = photoIds[catalogKey] or rendition.publishedPhotoId
+        else
+          photoId = photoIds[catalogKey] or photoIds[''] or rendition.publishedPhotoId
+        end
+      end)
     end
 
     if not rendition.wasSkipped then
@@ -293,10 +288,6 @@ function publishServiceProvider.processRenderedPhotos( functionContext, exportCo
               end
             end
           end
-
-          -- Remember this in the list of photos we uploaded.
-          uploadedPhotoIds[photo.localIdentifier] = upload.uuid
-
         else
           rendition:uploadFailed(error_msg or LOC("$$$/PhotoDeck/ProcessRenderedPhotos/ErrorUploading=Upload failed"))
         end
