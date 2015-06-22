@@ -10,5 +10,5 @@ return {
     file = "PhotoDeckPublishServiceProvider.lua", -- the service definition script
   },
   LrMetadataProvider = "PhotoDeckMetadataDefinition.lua",
-  VERSION = { major=0, minor=14, revision=0 },
+  VERSION = { major=0, minor=14, revision=1 },
 }

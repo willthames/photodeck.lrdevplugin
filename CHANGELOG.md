@@ -1,3 +1,5 @@
+0.14.1 - 22/06/2015
+-------------------
 Fix image duplication on PhotoDeck when publishing a photo deleted directly from PhotoDeck to another gallery and then republishing the photo from a previous gallery
 
 0.14.0 - 18/06/2015
