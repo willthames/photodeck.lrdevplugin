@@ -1029,7 +1029,11 @@ end
 
 local function buildPhotoInfoFromLrPhoto(photo, updating)
   local photoInfo = {}
-  photoInfo['media[title]'] = photo:getFormattedMetadata("title")
+  local title = photo:getFormattedMetadata("title")
+  if not title or title == "" then
+    title = photo:getFormattedMetadata("headline")
+  end
+  photoInfo['media[title]'] = title
   photoInfo['media[description]'] = photo:getFormattedMetadata("caption")
   photoInfo['media[keywords]'] = photo:getFormattedMetadata("keywordTagsForExport")
   photoInfo['media[location]'] = photo:getFormattedMetadata("location")
