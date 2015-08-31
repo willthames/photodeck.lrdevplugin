@@ -1027,7 +1027,7 @@ function PhotoDeckAPI.subGalleriesInGallery(urlname, galleryId)
   end
 end
 
-local function buildPhotoInfoFromLrPhoto(photo)
+local function buildPhotoInfoFromLrPhoto(photo, updating)
   local photoInfo = {}
   photoInfo['media[title]'] = photo:getFormattedMetadata("title")
   photoInfo['media[description]'] = photo:getFormattedMetadata("caption")
@@ -1038,6 +1038,12 @@ local function buildPhotoInfoFromLrPhoto(photo)
   photoInfo['media[country]'] = photo:getFormattedMetadata("country")
   photoInfo['media[author]'] = photo:getFormattedMetadata("creator")
   photoInfo['media[copyright]'] = photo:getFormattedMetadata("copyright")
+  local artist_rating = photo:getFormattedMetadata("rating")
+  if updating and not artist_rating then
+    photoInfo['media[delete_artist_rating]'] = 1
+  else
+    photoInfo['media[artist_rating]'] = artist_rating
+  end
   return photoInfo
 end
 
@@ -1082,7 +1088,7 @@ function PhotoDeckAPI.updatePhoto(photoId, urlname, attributes, handleNotFound)
     table.insert(content, { name = 'media[publish_to_galleries]', value = attributes.publishToGallery })
   end
   if attributes.lrPhoto then
-    local attributesFromLrPhoto = buildPhotoInfoFromLrPhoto(attributes.lrPhoto)
+    local attributesFromLrPhoto = buildPhotoInfoFromLrPhoto(attributes.lrPhoto, true)
     for k,v in pairs(attributesFromLrPhoto) do
       table.insert(content, { name = k, value = v })
     end
