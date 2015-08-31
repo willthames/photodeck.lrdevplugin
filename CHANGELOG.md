@@ -1,3 +1,8 @@
+0.15.0 - 31/08/2015
+-------------------
+Update photo ratings from Lightroom
+Use IPTC headline as photo title when title is blank
+
 0.14.1 - 22/06/2015
 -------------------
 Fix image duplication on PhotoDeck when publishing a photo deleted directly from PhotoDeck to another gallery and then republishing the photo from a previous gallery
