@@ -1,3 +1,7 @@
+0.15.1 - 01/09/2016
+-------------------
+Use IPTC headline as photo title, fallback to title when blank
+
 0.15.0 - 31/08/2015
 -------------------
 Update photo ratings from Lightroom
