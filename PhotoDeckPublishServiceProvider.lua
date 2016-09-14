@@ -169,7 +169,7 @@ function publishServiceProvider.processRenderedPhotos( functionContext, exportCo
     local galleryPhotos
 
     if galleryId then
-      gallery, error_msg = PhotoDeckAPI.gallery(urlname, galleryId)
+      gallery, error_msg = PhotoDeckAPI.gallery(urlname, galleryId, true)
       if error_msg then
         progressScope:done()
         LrErrors.throwUserError(LOC("$$$/PhotoDeck/ProcessRenderedPhotos/ErrorGettingGallery=Error retrieving gallery: ^1", error_msg))

@@ -369,10 +369,12 @@ function PhotoDeckAPI.galleries(urlname)
   return result, error_msg
 end
 
-function PhotoDeckAPI.gallery(urlname, galleryId)
+function PhotoDeckAPI.gallery(urlname, galleryId, ignore_not_found)
   logger:trace(string.format('PhotoDeckAPI.gallery("%s", "%s")', urlname, galleryId))
   local onerror = {}
-  onerror["404"] = function() return nil end
+  if ignore_not_found then
+    onerror["404"] = function() return nil end
+  end
   local response, error_msg = PhotoDeckAPI.request('GET', '/websites/' .. urlname .. '/galleries/' .. galleryId .. '.xml', { view = 'details' }, onerror)
   local result = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.gallery)
   -- logger:trace(printTable(result))
@@ -443,7 +445,7 @@ function PhotoDeckAPI.createOrUpdateGallery(urlname, collectionInfo, updateSetti
   local galleryId = collection:getRemoteId()
   if galleryId then
     -- find by remote ID if known
-    gallery = PhotoDeckAPI.gallery(urlname, galleryId)
+    gallery = PhotoDeckAPI.gallery(urlname, galleryId, true)
 
     if gallery then
       local parentsCount = 0
@@ -481,7 +483,7 @@ function PhotoDeckAPI.createOrUpdateGallery(urlname, collectionInfo, updateSetti
       local parentId = parent.remoteCollectionId
       if parentId then
         -- find by remote ID if known
-        parentGallery = PhotoDeckAPI.gallery(urlname, parentId)
+        parentGallery = PhotoDeckAPI.gallery(urlname, parentId, true)
       end
       if not parentGallery and not parentJustCreated then
         -- not found, search by name within subgalleries present in our parent
