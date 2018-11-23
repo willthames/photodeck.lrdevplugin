@@ -154,6 +154,7 @@ function publishServiceProvider.processRenderedPhotos( functionContext, exportCo
   -- Look for a gallery id for this collection.
   local urlname = exportSettings.websiteChosen
   local gallery = nil
+  local website
   local websiteuuid = nil
 
   if isPublish then

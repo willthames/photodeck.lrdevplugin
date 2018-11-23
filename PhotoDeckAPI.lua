@@ -211,6 +211,7 @@ end
 function PhotoDeckAPI.request(method, uri, data, onerror)
   local querystring = ''
   local body = ''
+  local error_msg
   if data then
     if method == 'GET' then
       querystring = table_to_querystring(data)
@@ -247,6 +248,7 @@ function PhotoDeckAPI.request(method, uri, data, onerror)
 end
 
 function PhotoDeckAPI.requestMultiPart(method, uri, content, onerror)
+  local error_msg
   local seq = string.format("%5i", math.random(99999))
   logger:trace(string.format(' %s -> %s[multipart] %s', seq, method, uri))
 
@@ -331,7 +333,7 @@ function PhotoDeckAPI.websites()
     response, error_msg = PhotoDeckAPI.request('GET', '/websites.xml', { view = 'details' })
     result = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.websites)
     if not error_msg then
-      websites_count = 0
+      local websites_count = 0
       if result then
         for _ in pairs(result) do websites_count = websites_count + 1 end
       end
@@ -549,6 +551,7 @@ function PhotoDeckAPI.createOrUpdateGallery(urlname, collectionInfo, updateSetti
     -- PhotoDeck gallery found, update if necessary
     local changed = gallery.parentuuid ~= parentGalleryId or gallery.name ~= collectionInfo.name
 
+    local collectionSettings
     local settingsChanged = false
     if updateSettings then
       -- User has edited the gallery settings (ie, description and/or display style), so update gallery if changed
@@ -667,7 +670,7 @@ function PhotoDeckAPI.synchronizeGalleries(urlname, publishService, progressScop
       local rid = lrCollection:getRemoteId()
       if not rid or rid == '' then
         -- unconnected published collection, try to connect by name
-        lrCollectionName = lrCollection:getName()
+        local lrCollectionName = lrCollection:getName()
         for uuid, gallery in pairs(pdGalleries) do
           if lrCollectionName == gallery.name then
             -- found matching gallery
@@ -695,7 +698,7 @@ function PhotoDeckAPI.synchronizeGalleries(urlname, publishService, progressScop
         deleteCount = deleteCount + 1
       elseif lrCollectionsByRemoteId[rid] then
         -- duplicate LR collections!
-        lrCollectionDup = lrCollectionsByRemoteId[rid]
+        local lrCollectionDup = lrCollectionsByRemoteId[rid]
         if gallery.name == lrCollectionDup:getName() then
           logger:trace(string.format("SYNC: Lightroom Published Collection %i '%s' is connected to PhotoDeck gallery %s '%s', but we already have Published Collection %i '%s' connected to it. Deleting the former.", lrCollection.localIdentifier, lrCollection:getName(), rid, gallery.name, lrCollectionDup.localIdentifier, lrCollectionDup:getName()))
           catalog:withWriteAccessDo('Deleting Published Collection', function()
@@ -720,7 +723,7 @@ function PhotoDeckAPI.synchronizeGalleries(urlname, publishService, progressScop
       local rid = lrCollectionSet:getRemoteId()
       if not rid or rid == '' then
         -- unconnected published collection, try to connect by name
-        lrCollectionSetName = lrCollectionSet:getName()
+        local lrCollectionSetName = lrCollectionSet:getName()
         for uuid, gallery in pairs(pdGalleries) do
           if lrCollectionSetName == gallery.name then
             -- found matching gallery
@@ -748,7 +751,7 @@ function PhotoDeckAPI.synchronizeGalleries(urlname, publishService, progressScop
         deleteCount = deleteCount + 1
       elseif lrCollectionSetsByRemoteId[rid] then
         -- duplicate LR collections sets!
-        lrCollectionSetd = lrCollectionSetsByRemoteId[rid]
+        local lrCollectionSetd = lrCollectionSetsByRemoteId[rid]
         if gallery.name == lrCollectionSetd:getName() then
           logger:trace(string.format("SYNC: Lightroom Published Collection Set %i '%s' is connected to PhotoDeck gallery %s '%s', but we already have Published Collection Set %i '%s' connected to it. Deleting the former.", lrCollectionSet.localIdentifier, lrCollectionSet:getName(), rid, gallery.name, lrCollectionSetd.localIdentifier, lrCollectionSetd:getName()))
           catalog:withWriteAccessDo('Deleting Published Collection Set', function()
@@ -1250,7 +1253,7 @@ function PhotoDeckAPI.galleryDisplayStyles(urlname)
     response, error_msg = PhotoDeckAPI.request('GET', url, { view = 'details' })
     result = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.galleryDisplayStyles)
     if not error_msg then
-      styles_count = 0
+      local styles_count = 0
       if result then
         for _ in pairs(result) do styles_count = styles_count + 1 end
       end

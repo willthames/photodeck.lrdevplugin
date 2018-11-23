@@ -207,6 +207,7 @@ return t
 PhotoDeckAPIXSLT.transform = function(xmlstring, xslt)
   if xmlstring and string.sub(xmlstring, 1, 5) == '<?xml' then
     -- prevent LUA code injection
+    local _
     xmlstring, _ = string.gsub(xmlstring, '%[====%[', '')
     xmlstring, _ = string.gsub(xmlstring, '%]====%]', '')
 

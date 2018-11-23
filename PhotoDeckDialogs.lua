@@ -50,6 +50,7 @@ local function login(propertyTable)
 
     if PhotoDeckAPI.loggedin then
       -- get available websites
+      local websites
       websites, error_msg = PhotoDeckAPI.websites()
       if error_msg then
         propertyTable.connectionStatus = LOC("$$$/PhotoDeck/ConnectionStatus/FailedLoadingWebsite=Couldn't get your website: ^1", error_msg)
