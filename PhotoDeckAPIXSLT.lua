@@ -5,11 +5,11 @@ logger:enable('logfile')
 local xsltheader = [====[
 <xsl:stylesheet version="1.0"
     xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
- <xsl:output method="text"/>
+  <xsl:output method="text"/>
+  <xsl:template match="/reply/*"/>
 ]====]
 
 local xsltfooter = [====[
-  <xsl:template match="request|query-string|error"/>
 </xsl:stylesheet>
 ]====]
 
@@ -163,24 +163,33 @@ return t
 ]=====] .. xsltfooter
 
 PhotoDeckAPIXSLT.uploadPhoto = xsltheader .. [=====[
-  <xsl:template match='/reply/message'/>
-  <xsl:template match='/reply'>
+  <xsl:template match='/reply/media'>
 local t = {
-  uuid =  "<xsl:value-of select='media-uuid'/>",
-  path =  "<xsl:value-of select='location'/>",
+  uuid = "<xsl:value-of select='uuid'/>",
+<xsl:if test="file-name">
+  filename = [====[<xsl:value-of select='file-name'/>]====],
+</xsl:if>
+<xsl:if test="upload-location">
+  uploadlocation = "<xsl:value-of select='upload-location'/>",
+</xsl:if>
+<xsl:if test="upload-url">
+  uploadurl = "<xsl:value-of select='upload-url'/>",
+</xsl:if>
+<xsl:if test="upload-file-param">
+  uploadfileparam = "<xsl:value-of select='upload-file-param'/>"
+</xsl:if>
 }
+<xsl:if test="upload-params">
+  t.uploadparams = {}
+  <xsl:for-each select='upload-params/*'>
+  t.uploadparams["<xsl:value-of select='name()'/>"] = [====[<xsl:value-of select='.'/>]====]
+  </xsl:for-each>
+</xsl:if>
 return t
   </xsl:template>
 ]=====] .. xsltfooter
 
-PhotoDeckAPIXSLT.updatePhoto = xsltheader .. [=====[
-  <xsl:template match='/reply'>
-local t = {
-  uuid =  "<xsl:value-of select='media-uuid'/>",
-}
-return t
-  </xsl:template>
-]=====] .. xsltfooter
+PhotoDeckAPIXSLT.updatePhoto = PhotoDeckAPIXSLT.uploadPhoto
 
 PhotoDeckAPIXSLT.galleryDisplayStyles = xsltheader .. [=====[
   <xsl:template match='/reply/gallery-display-styles'>

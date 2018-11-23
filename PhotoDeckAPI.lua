@@ -33,6 +33,7 @@ local PhotoDeckAPI = {
 }
 
 local PhotoDeckAPICache = {}
+local canRequestUploadLocation = true
 
 -- sign API request according to docs at
 -- http://www.photodeck.com/developers/get-started/
@@ -1053,12 +1054,71 @@ local function buildPhotoInfoFromLrPhoto(photo, updating)
   return photoInfo
 end
 
+local function buildFileUploadParams(contentPath)
+  local content = {}
+  local upload_location_requested = false
+  local file_size = 0
+  local mime_type = 'image/jpeg'
+  if canRequestUploadLocation then
+    local file_attrs = LrFileUtils.fileAttributes(contentPath)
+    file_size = file_attrs.fileSize
+    table.insert(content, { name = 'media[content][upload_location]', value = 'REQUEST' })
+    table.insert(content, { name = 'media[content][file_name]', value = PhotoDeckUtils.basename(contentPath) })
+    table.insert(content, { name = 'media[content][file_size]', value = file_size })
+    table.insert(content, { name = 'media[content][mime_type]', value = mime_type })
+    upload_location_requested = true
+  else
+    table.insert(content, { name = 'media[content]', filePath = contentPath, fileName = PhotoDeckUtils.basename(contentPath), contentType = mime_type })
+  end
+  return content, upload_location_requested, file_size, mime_type
+end
+
+local function handleIndirectUpload(contentPath, urlname, media, file_size, mime_type)
+  local error_msg = nil
+  local content = {}
+  if media.uploadurl and media.uploadurl ~= "" then
+    for k,v in pairs(media.uploadparams) do
+      table.insert(content, { name = k, value = v })
+    end
+    table.insert(content, { name = media.uploadfileparam, filePath = contentPath, fileName = media.filename, contentType = mime_type })
+    --logger:trace('PhotoDeckAPI.handleIndirectUpload: ' .. printTable(content))
+    local seq = string.format("%5i", math.random(99999))
+    logger:trace(string.format(' %s -> %s[multipart] %s', seq, 'POST', media.uploadurl))
+    local result, resp_headers
+    result, resp_headers = LrHttp.postMultipart(media.uploadurl, content)
+    local status_code = 999
+    if resp_headers.status then
+      status_code = tostring(resp_headers.status)
+    end
+    logger:error(string.format(' %s <- %s', seq, status_code))
+    if status_code >= "200" and status_code <= "299" then
+      return PhotoDeckAPI.updatePhoto(media.uuid, urlname, {
+        contentUploadLocation = media.uploadlocation,
+        contentFileName = media.filename,
+        contentFileSize = file_size,
+        contentMimeType = mime_type }, false)
+    else
+      error_msg = LOC("$$$/PhotoDeck/API/HTTPError=HTTP error ^1", status_code)
+    end
+
+  else
+    error_msg = LOC("$$$/PhotoDeck/API/Media/UploadURLMissing=Upload URL missing")
+    canRequestUploadLocation = false
+  end
+
+  return media, error_msg
+end
+
 function PhotoDeckAPI.uploadPhoto(urlname, attributes)
   logger:trace(string.format('PhotoDeckAPI.uploadPhoto("%s", <attributes>)', urlname))
   local url = '/medias.xml'
   local content = {}
+  local upload_location_requested = false
+  local file_size
+  local mime_type
+  --logger:trace('PhotoDeckAPI.uploadPhoto: ' .. printTable(content))
   if attributes.contentPath then
-    table.insert(content, { name = 'media[content]', filePath = attributes.contentPath, fileName = PhotoDeckUtils.basename(attributes.contentPath), contentType = 'image/jpeg' })
+    content, upload_location_requested, file_size, mime_type = buildFileUploadParams(attributes.contentPath)
   end
   if attributes.publishToGallery then
     table.insert(content, { name = 'media[publish_to_galleries]', value = attributes.publishToGallery })
@@ -1076,6 +1136,14 @@ function PhotoDeckAPI.uploadPhoto(urlname, attributes)
     error_msg = LOC("$$$/PhotoDeck/API/Media/UploadFailed=Upload failed")
   end
   --logger:trace('PhotoDeckAPI.uploadPhoto: ' .. printTable(media))
+
+  if media and not error_msg and upload_location_requested then
+    media, error_msg = handleIndirectUpload(attributes.contentPath, urlname, media, file_size, mime_type)
+    if error_msg and not canRequestUploadLocation then
+      return PhotoDeckAPI.uploadPhoto(urlname, attributes) -- retry, indirect upload not available
+    end
+  end
+
   return media, error_msg
 end
 
@@ -1087,8 +1155,17 @@ function PhotoDeckAPI.updatePhoto(photoId, urlname, attributes, handleNotFound)
     onerror["404"] = function() return nil, 'Not found' end
   end
   local content = {}
+  local upload_location_requested = false
+  local file_size
+  local mime_type
   if attributes.contentPath then
-    table.insert(content, { name = 'media[content]', filePath = attributes.contentPath, fileName = PhotoDeckUtils.basename(attributes.contentPath), contentType = 'image/jpeg' })
+    content, upload_location_requested, file_size, mime_type = buildFileUploadParams(attributes.contentPath)
+  end
+  if attributes.contentUploadLocation then
+    table.insert(content, { name = 'media[content][upload_location]', value = attributes.contentUploadLocation })
+    table.insert(content, { name = 'media[content][file_name]', value = attributes.contentFileName })
+    table.insert(content, { name = 'media[content][file_size]', value = attributes.contentFileSize })
+    table.insert(content, { name = 'media[content][mime_type]', value = attributes.contentMimeType })
   end
   if attributes.publishToGallery then
     table.insert(content, { name = 'media[publish_to_galleries]', value = attributes.publishToGallery })
@@ -1110,6 +1187,14 @@ function PhotoDeckAPI.updatePhoto(photoId, urlname, attributes, handleNotFound)
     error_msg = LOC("$$$/PhotoDeck/API/Media/UpdateFailed=Update failed")
   end
   --logger:trace('PhotoDeckAPI.updatePhoto: ' .. printTable(media))
+
+  if media and not error_msg and upload_location_requested then
+    media, error_msg = handleIndirectUpload(attributes.contentPath, urlname, media, file_size, mime_type)
+    if error_msg and not canRequestUploadLocation then
+      return PhotoDeckAPI.updatePhoto(photoId, urlname, attributes, handleNotFound) -- retry, indirect upload not available
+    end
+  end
+
   return media, error_msg
 end
 
