@@ -1113,13 +1113,12 @@ local function handleIndirectUpload(contentPath, urlname, media, file_size, mime
 end
 
 function PhotoDeckAPI.uploadPhoto(urlname, attributes)
-  logger:trace(string.format('PhotoDeckAPI.uploadPhoto("%s", <attributes>)', urlname))
+  logger:trace(string.format('PhotoDeckAPI.uploadPhoto("%s", %s)', urlname, printTable(attributes)))
   local url = '/medias.xml'
   local content = {}
   local upload_location_requested = false
   local file_size
   local mime_type
-  --logger:trace('PhotoDeckAPI.uploadPhoto: ' .. printTable(content))
   if attributes.contentPath then
     content, upload_location_requested, file_size, mime_type = buildFileUploadParams(attributes.contentPath)
   end
@@ -1151,7 +1150,7 @@ function PhotoDeckAPI.uploadPhoto(urlname, attributes)
 end
 
 function PhotoDeckAPI.updatePhoto(photoId, urlname, attributes, handleNotFound)
-  logger:trace(string.format('PhotoDeckAPI.updatePhoto("%s", "%s", <attributes>)', photoId, urlname))
+  logger:trace(string.format('PhotoDeckAPI.updatePhoto("%s", "%s", %s)', photoId, urlname, printTable(attributes)))
   local url = '/medias/' .. photoId .. '.xml'
   local onerror = {}
   if handleNotFound then
