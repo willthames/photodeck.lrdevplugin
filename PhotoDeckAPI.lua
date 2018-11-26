@@ -405,13 +405,7 @@ function PhotoDeckAPI.createGallery(urlname, parentId, collectionInfo)
   local galleryInfo = buildGalleryInfoFromLrCollectionInfo(collectionInfo)
   galleryInfo['gallery[parent]'] = parentId
   local response, error_msg = PhotoDeckAPI.request('POST', '/websites/' .. urlname .. '/galleries.xml', galleryInfo)
-  local result = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.createGallery)
-
-  if error_msg then
-    return result, error_msg
-  end
-
-  local gallery, error_msg = PhotoDeckAPI.gallery(urlname, result['uuid'])
+  local gallery = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.gallery)
   return gallery, error_msg
 end
 
@@ -420,12 +414,7 @@ function PhotoDeckAPI.updateGallery(urlname, galleryId, parentId, collectionInfo
   local galleryInfo = buildGalleryInfoFromLrCollectionInfo(collectionInfo)
   galleryInfo['gallery[parent]'] = parentId
   local response, error_msg = PhotoDeckAPI.request('PUT', '/websites/' .. urlname .. '/galleries/' .. galleryId .. '.xml', galleryInfo)
-
-  if error_msg then
-    return nil, error_msg
-  end
-
-  local gallery, error_msg = PhotoDeckAPI.gallery(urlname, galleryId)
+  local gallery = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.gallery)
   return gallery, error_msg
 end
 

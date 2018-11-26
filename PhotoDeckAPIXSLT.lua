@@ -96,15 +96,6 @@ return t
   </xsl:template>
 ]=====] .. xsltfooter
 
-PhotoDeckAPIXSLT.createGallery = xsltheader .. [=====[
-  <xsl:template match='/reply'>
-local t = {
-     uuid = "<xsl:value-of select='gallery-uuid'/>",
-}
-return t
-  </xsl:template>
-]=====] .. xsltfooter
-
 PhotoDeckAPIXSLT.getPhoto = xsltheader .. [=====[
   <xsl:template match='/reply/media'>
 local t = {
