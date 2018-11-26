@@ -27,7 +27,7 @@ return [====[<xsl:value-of select='message'/>]====]
   </xsl:template>
 ]=====] .. xsltfooter
 
-PhotoDeckAPIXSLT.whoami = xsltheader .. [=====[
+PhotoDeckAPIXSLT.user = xsltheader .. [=====[
   <xsl:template match='/reply/user'>
 local t = {
   firstname = [====[<xsl:value-of select='firstname'/>]====],
@@ -96,16 +96,41 @@ return t
   </xsl:template>
 ]=====] .. xsltfooter
 
-PhotoDeckAPIXSLT.getPhoto = xsltheader .. [=====[
+PhotoDeckAPIXSLT.media = xsltheader .. [=====[
   <xsl:template match='/reply/media'>
 local t = {
   uuid = "<xsl:value-of select='uuid'/>",
+<xsl:if test="file-name">
   filename = [====[<xsl:value-of select='file-name'/>]====],
+</xsl:if>
+<xsl:if test="title">
   title = [====[<xsl:value-of select='title'/>]====],
+</xsl:if>
+<xsl:if test="file-name">
   description = [====[<xsl:value-of select='description'/>]====],
+</xsl:if>
+<xsl:if test="keywords">
   <xsl:apply-templates select='keywords'/>
+</xsl:if>
+<xsl:if test="galleries">
   <xsl:apply-templates select='galleries'/>
+</xsl:if>
 }
+<xsl:if test="upload-location">
+  t.uploadlocation = "<xsl:value-of select='upload-location'/>"
+</xsl:if>
+<xsl:if test="upload-url">
+  t.uploadurl = "<xsl:value-of select='upload-url'/>"
+</xsl:if>
+<xsl:if test="upload-file-param">
+  t.uploadfileparam = "<xsl:value-of select='upload-file-param'/>"
+</xsl:if>
+<xsl:if test="upload-params">
+  t.uploadparams = {}
+  <xsl:for-each select='upload-params/*'>
+  t.uploadparams["<xsl:value-of select='name()'/>"] = [====[<xsl:value-of select='.'/>]====]
+  </xsl:for-each>
+</xsl:if>
 return t
   </xsl:template>
   <xsl:template match='galleries'>
@@ -125,7 +150,7 @@ return t
 ]=====] .. xsltfooter
 
 
-PhotoDeckAPIXSLT.photosInGallery = xsltheader .. [=====[
+PhotoDeckAPIXSLT.mediasInGallery = xsltheader .. [=====[
   <xsl:template match='/reply/gallery/*'/>
   <xsl:template match='/reply/gallery/medias'>
 local t = {
@@ -158,35 +183,6 @@ PhotoDeckAPIXSLT.uploadStopWithError = xsltheader .. [=====[
 return "<xsl:value-of select='stop-with-error'/>"
   </xsl:template>
 ]=====] .. xsltfooter
-
-PhotoDeckAPIXSLT.uploadPhoto = xsltheader .. [=====[
-  <xsl:template match='/reply/media'>
-local t = {
-  uuid = "<xsl:value-of select='uuid'/>",
-<xsl:if test="file-name">
-  filename = [====[<xsl:value-of select='file-name'/>]====],
-</xsl:if>
-<xsl:if test="upload-location">
-  uploadlocation = "<xsl:value-of select='upload-location'/>",
-</xsl:if>
-<xsl:if test="upload-url">
-  uploadurl = "<xsl:value-of select='upload-url'/>",
-</xsl:if>
-<xsl:if test="upload-file-param">
-  uploadfileparam = "<xsl:value-of select='upload-file-param'/>"
-</xsl:if>
-}
-<xsl:if test="upload-params">
-  t.uploadparams = {}
-  <xsl:for-each select='upload-params/*'>
-  t.uploadparams["<xsl:value-of select='name()'/>"] = [====[<xsl:value-of select='.'/>]====]
-  </xsl:for-each>
-</xsl:if>
-return t
-  </xsl:template>
-]=====] .. xsltfooter
-
-PhotoDeckAPIXSLT.updatePhoto = PhotoDeckAPIXSLT.uploadPhoto
 
 PhotoDeckAPIXSLT.galleryDisplayStyles = xsltheader .. [=====[
   <xsl:template match='/reply/gallery-display-styles'>

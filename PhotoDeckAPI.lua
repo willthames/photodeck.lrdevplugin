@@ -315,7 +315,7 @@ end
 function PhotoDeckAPI.whoami()
   logger:trace('PhotoDeckAPI.whoami()')
   local response, error_msg = PhotoDeckAPI.request('GET', '/whoami.xml')
-  local result = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.whoami)
+  local result = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.user)
   if not result or not result.email or result.email == '' then
     PhotoDeckAPI.loggedin = false
     PhotoDeckAPI.sessionCookie = nil
@@ -950,7 +950,7 @@ function PhotoDeckAPI.getPhoto(photoId)
   local onerror = {}
   onerror["404"] = function() return nil end
   local response, error_msg = PhotoDeckAPI.request('GET', url, nil, onerror)
-  local result = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.getPhoto)
+  local result = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.media)
   --logger:trace('PhotoDeckAPI.getPhoto: ' .. printTable(result))
   return result, error_msg
 end
@@ -959,7 +959,7 @@ function PhotoDeckAPI.photosInGallery(urlname, galleryId)
   logger:trace(string.format('PhotoDeckAPI.photosInGallery("%s", "%s")', urlname, galleryId))
   local url = '/websites/' .. urlname .. '/galleries/' .. galleryId .. '.xml'
   local response, error_msg = PhotoDeckAPI.request('GET', url, { view = 'details_with_medias' })
-  local medias = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.photosInGallery)
+  local medias = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.mediasInGallery)
 
   if not medias and not error_msg then
     error_msg = LOC("$$$/PhotoDeck/API/Gallery/ErrorGettingPhotos=Couldn't get photos in gallery")
@@ -1082,7 +1082,7 @@ local function handleIndirectUpload(contentPath, urlname, media, file_size, mime
     if resp_headers.status then
       status_code = tostring(resp_headers.status)
     end
-    logger:error(string.format(' %s <- %s', seq, status_code))
+    logger:trace(string.format(' %s <- %s', seq, status_code))
     if status_code >= "200" and status_code <= "299" then
       return PhotoDeckAPI.updatePhoto(media.uuid, urlname, {
         contentUploadLocation = media.uploadlocation,
@@ -1122,7 +1122,7 @@ function PhotoDeckAPI.uploadPhoto(urlname, attributes)
   end
   --logger:trace('PhotoDeckAPI.uploadPhoto: ' .. printTable(content))
   local response, error_msg = PhotoDeckAPI.requestMultiPart('POST', url, content)
-  local media = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.uploadPhoto)
+  local media = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.media)
   if not media and not error_msg then
     error_msg = LOC("$$$/PhotoDeck/API/Media/UploadFailed=Upload failed")
   end
@@ -1173,7 +1173,7 @@ function PhotoDeckAPI.updatePhoto(photoId, urlname, attributes, handleNotFound)
     return { notfound = true }, error_msg
   end
 
-  local media = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.updatePhoto)
+  local media = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.media)
   if not media and not error_msg then
     error_msg = LOC("$$$/PhotoDeck/API/Media/UpdateFailed=Update failed")
   end
