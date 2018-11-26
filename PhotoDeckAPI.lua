@@ -366,10 +366,42 @@ end
 
 function PhotoDeckAPI.galleries(urlname)
   logger:trace(string.format('PhotoDeckAPI.galleries("%s")', urlname))
-  local response, error_msg = PhotoDeckAPI.request('GET', '/websites/' .. urlname .. '/galleries.xml', { view = 'details' })
-  local result = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.galleries)
-  -- logger:trace(printTable(result))
-  return result, error_msg
+  local galleries
+  local allgalleries = {}
+  local response
+  local error_msg = nil
+  local page = 0
+  local totalPages = 1
+  local newTotalPages
+  while not error_msg and page < totalPages do
+    page = page + 1
+    response, error_msg = PhotoDeckAPI.request('GET', '/websites/' .. urlname .. '/galleries.xml', { view = 'details', page = page, per_page = 500 })
+    galleries = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.galleries)
+    newTotalPages = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.totalPages)
+    if newTotalPages and newTotalPages ~= "" then
+      totalPages = tonumber(newTotalPages)
+    end
+    --logger:trace("PhotoDeckAPI.galleries " .. tostring(page) .. "/" .. tostring(totalPages) .. ": " .. printTable(galleries))
+
+    if not galleries and not error_msg then
+      error_msg = LOC("$$$/PhotoDeck/API/Gallery/ErrorGettingGalleries=Couldn't get galleries")
+    end
+
+    if not error_msg then
+      local added_count = 0
+      for uuid, gallery in pairs(galleries) do
+        added_count = added_count + 1
+        allgalleries[uuid] = gallery
+      end
+      if added_count == 0 then break end
+    end
+  end
+  if not error_msg then
+    --logger:trace("PhotoDeckAPI.galleries: " .. printTable(allgalleries))
+    return allgalleries
+  else
+    return nil, error_msg
+  end
 end
 
 function PhotoDeckAPI.gallery(urlname, galleryId, ignore_not_found)

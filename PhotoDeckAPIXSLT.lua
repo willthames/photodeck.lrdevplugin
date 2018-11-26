@@ -178,6 +178,12 @@ return t
   </xsl:template>
 ]=====] .. xsltfooter
 
+PhotoDeckAPIXSLT.totalPages = xsltheader .. [=====[
+  <xsl:template match='/reply'>
+return "<xsl:value-of select='total-pages'/>"
+  </xsl:template>
+]=====] .. xsltfooter
+
 PhotoDeckAPIXSLT.uploadStopWithError = xsltheader .. [=====[
   <xsl:template match='/reply'>
 return "<xsl:value-of select='stop-with-error'/>"
