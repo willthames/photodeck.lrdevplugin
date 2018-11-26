@@ -1146,7 +1146,7 @@ function PhotoDeckAPI.uploadPhoto(urlname, attributes)
     end
   end
 
-  return media, error_msg
+  return media, error_msg, (error_msg and PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.uploadStopWithError) == "true")
 end
 
 function PhotoDeckAPI.updatePhoto(photoId, urlname, attributes, handleNotFound)
@@ -1197,7 +1197,7 @@ function PhotoDeckAPI.updatePhoto(photoId, urlname, attributes, handleNotFound)
     end
   end
 
-  return media, error_msg
+  return media, error_msg, (error_msg and PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.uploadStopWithError) == "true")
 end
 
 function PhotoDeckAPI.deletePhoto(photoId)

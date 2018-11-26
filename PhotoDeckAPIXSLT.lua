@@ -162,6 +162,12 @@ return t
   </xsl:template>
 ]=====] .. xsltfooter
 
+PhotoDeckAPIXSLT.uploadStopWithError = xsltheader .. [=====[
+  <xsl:template match='/reply'>
+return "<xsl:value-of select='stop-with-error'/>"
+  </xsl:template>
+]=====] .. xsltfooter
+
 PhotoDeckAPIXSLT.uploadPhoto = xsltheader .. [=====[
   <xsl:template match='/reply/media'>
 local t = {

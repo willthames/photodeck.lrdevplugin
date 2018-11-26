@@ -141,6 +141,7 @@ function publishServiceProvider.processRenderedPhotos( functionContext, exportCo
   local nPhotos = exportSession:countRenditions()
   local catalog = exportSession.catalog
   local error_msg
+  local cancel_next_uploads = false
 
   PhotoDeckAPI.connect(exportSettings.apiKey, exportSettings.apiSecret, exportSettings.username, exportSettings.password)
 
@@ -202,29 +203,29 @@ function publishServiceProvider.processRenderedPhotos( functionContext, exportCo
     local photoId = nil
     local catalogKey = nil
 
-    -- See if we previously uploaded this photo.
-    if isPublish then
-      local isVirtualCopy = photo:getRawMetadata('isVirtualCopy')
-      if isVirtualCopy then
-        -- virtual copy shares the same metadata catalog entries it seems, so we use a different key to store the PhotoDeck ID
-        catalogKey = websiteuuid .. "/" .. tostring(photo.localIdentifier)
-      else
-        catalogKey = websiteuuid
+    if not rendition.wasSkipped and not cancel_next_uploads then
+      -- See if we previously uploaded this photo.
+      if isPublish then
+        local isVirtualCopy = photo:getRawMetadata('isVirtualCopy')
+        if isVirtualCopy then
+          -- virtual copy shares the same metadata catalog entries it seems, so we use a different key to store the PhotoDeck ID
+          catalogKey = websiteuuid .. "/" .. tostring(photo.localIdentifier)
+        else
+          catalogKey = websiteuuid
+        end
+
+        -- get photo ID from previous upload (either in this gallery or another one)
+        -- NOTE: we are using rendition.publishedPhotoId only as a last resort, as the photo might have seen it's UUID change in another gallery (e.g., following a manual deletion directly within PhotoDeck, followed by a publication in another gallery) -- rendition.publishedPhotoId might thus be outdated
+        catalog:withReadAccessDo( function()
+          local photoIds = getPhotoDeckPhotoIdsStoredInCatalog(photo)
+          if isVirtualCopy then
+            photoId = photoIds[catalogKey] or rendition.publishedPhotoId
+          else
+            photoId = photoIds[catalogKey] or photoIds[''] or rendition.publishedPhotoId
+          end
+        end)
       end
 
-      -- get photo ID from previous upload (either in this gallery or another one)
-      -- NOTE: we are using rendition.publishedPhotoId only as a last resort, as the photo might have seen it's UUID change in another gallery (e.g., following a manual deletion directly within PhotoDeck, followed by a publication in another gallery) -- rendition.publishedPhotoId might thus be outdated
-      catalog:withReadAccessDo( function()
-        local photoIds = getPhotoDeckPhotoIdsStoredInCatalog(photo)
-        if isVirtualCopy then
-          photoId = photoIds[catalogKey] or rendition.publishedPhotoId
-        else
-          photoId = photoIds[catalogKey] or photoIds[''] or rendition.publishedPhotoId
-        end
-      end)
-    end
-
-    if not rendition.wasSkipped then
       local success, pathOrMessage = rendition:waitForRender()
       -- Update progress scope again once we've got rendered photo.
       progressScope:setPortionComplete( ( i - 0.5 ) / nPhotos )
@@ -250,7 +251,7 @@ function publishServiceProvider.processRenderedPhotos( functionContext, exportCo
 
           -- Upload or replace/update the photo.
           if photoAlreadyPublished then
-            upload, error_msg = PhotoDeckAPI.updatePhoto(photoId, urlname, photoAttributes, true)
+            upload, error_msg, cancel_next_uploads = PhotoDeckAPI.updatePhoto(photoId, urlname, photoAttributes, true)
             if upload and upload.notfound then
               -- Not found error on PhotoDeck. Assume that the photo is gone and that we need to upload it again.
               photoAlreadyPublished = false
@@ -259,7 +260,7 @@ function publishServiceProvider.processRenderedPhotos( functionContext, exportCo
           end
 
           if not photoAlreadyPublished then
-            upload, error_msg = PhotoDeckAPI.uploadPhoto(urlname, photoAttributes)
+            upload, error_msg, cancel_next_uploads = PhotoDeckAPI.uploadPhoto(urlname, photoAttributes)
           end
         end
 
@@ -297,6 +298,9 @@ function publishServiceProvider.processRenderedPhotos( functionContext, exportCo
         -- but this will help manage space in the event of a large upload.
         LrFileUtils.delete( pathOrMessage )
       end
+
+    elseif cancel_next_uploads then
+      rendition:renditionIsDone(false, error_msg or LOC("$$$/PhotoDeck/ProcessRenderedPhotos/ErrorUploading=Upload failed"))
     end
   end
 
