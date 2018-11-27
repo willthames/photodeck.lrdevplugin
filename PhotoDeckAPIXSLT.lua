@@ -122,6 +122,9 @@ local t = {
 <xsl:if test="upload-url">
   t.uploadurl = "<xsl:value-of select='upload-url'/>"
 </xsl:if>
+<xsl:if test="upload-method">
+  t.uploadmethod = "<xsl:value-of select='upload-method'/>"
+</xsl:if>
 <xsl:if test="upload-file-param">
   t.uploadfileparam = "<xsl:value-of select='upload-file-param'/>"
 </xsl:if>
