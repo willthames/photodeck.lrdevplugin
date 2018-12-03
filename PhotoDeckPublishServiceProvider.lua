@@ -266,8 +266,6 @@ function publishServiceProvider.processRenderedPhotos( functionContext, exportCo
 
         if not error_msg and upload and upload.uuid and upload.uuid ~= "" then
           if isPublish then
-            rendition:recordPublishedPhotoId(upload.uuid)
-
             -- Also save the remote photo ID at the LrPhoto level, so that we can find it when publishing in a different gallery
             catalog:withWriteAccessDo( "publish", function( context )
               storePhotoDeckPhotoIdsInCatalog(photo, catalogKey, upload.uuid)
@@ -289,6 +287,8 @@ function publishServiceProvider.processRenderedPhotos( functionContext, exportCo
                 end
               end
             end
+
+            rendition:recordPublishedPhotoId(upload.uuid)
           end
         else
           rendition:uploadFailed(error_msg or LOC("$$$/PhotoDeck/ProcessRenderedPhotos/ErrorUploading=Upload failed"))

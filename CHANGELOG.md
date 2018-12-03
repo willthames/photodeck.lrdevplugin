@@ -1,6 +1,7 @@
 0.16.0 - 23/11/2018
 -------------------
 Update to latest API
+Fix a case where just-republished photos would jump back again to "Modified Photos to Re-Published"
 
 0.15.1 - 01/09/2016
 -------------------
