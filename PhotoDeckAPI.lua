@@ -1110,7 +1110,7 @@ local function handleIndirectUpload(contentPath, urlname, media, file_size, mime
     logger:trace(string.format(' %s -> %s[multipart] %s', seq, 'POST', media.uploadurl))
     local result, resp_headers
     result, resp_headers = LrHttp.postMultipart(media.uploadurl, content)
-    local status_code = 999
+    local status_code = "999"
     if resp_headers.status then
       status_code = tostring(resp_headers.status)
     end
