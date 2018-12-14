@@ -189,7 +189,11 @@ local function handle_response(seq, response, resp_headers, onerror)
       PhotoDeckAPI.loggedin = false
       PhotoDeckAPI.sessionCookie = nil
     end
-    logger:error(string.format(' %s <- %s [%s]: %s', seq, status_code, request_id, error_msg))
+    if status_code == "999" then
+      logger:error(string.format(' %s <- %s [%s]: %s %s', seq, status_code, request_id, error_msg, printTable(resp_headers)))
+    else
+      logger:error(string.format(' %s <- %s [%s]: %s', seq, status_code, request_id, error_msg))
+    end
   else
     PhotoDeckAPI.loggedin = true
     logger:trace(string.format(' %s <- %s [%s]', seq, status_code, request_id))
@@ -1113,16 +1117,28 @@ local function handleIndirectUpload(contentPath, urlname, media, file_size, mime
     local status_code = "999"
     if resp_headers.status then
       status_code = tostring(resp_headers.status)
+      if status_code == "0" and result == "" then
+        status_code = "999"
+        result = nil
+      end
     end
-    logger:trace(string.format(' %s <- %s', seq, status_code))
     if status_code >= "200" and status_code <= "299" then
+      logger:trace(string.format(' %s <- %s', seq, status_code))
       return PhotoDeckAPI.updatePhoto(media.uuid, urlname, {
         contentUploadLocation = media.uploadlocation,
         contentFileName = media.filename,
         contentFileSize = file_size,
         contentMimeType = mime_type }, false)
+    end
+    if status_code == "999" then
+      error_msg = LOC("$$$/PhotoDeck/API/NoResponse=No response from network")
     else
       error_msg = LOC("$$$/PhotoDeck/API/HTTPError=HTTP error ^1", status_code)
+    end
+    if result then
+      logger:error(string.format(' %s <- %s: %s %s\n%s', seq, status_code, error_msg, printTable(resp_headers), result))
+    else
+      logger:error(string.format(' %s <- %s: %s %s', seq, status_code, error_msg, printTable(resp_headers)))
     end
 
   else

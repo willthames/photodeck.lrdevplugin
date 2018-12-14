@@ -1,3 +1,7 @@
+0.16.2 - 14/12/2018
+-------------------
+Add more logging in case of connection error
+
 0.16.1 - 23/11/2018
 -------------------
 Minor bug fix
