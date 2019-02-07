@@ -439,6 +439,7 @@ end
 function PhotoDeckAPI.createGallery(urlname, parentId, collectionInfo)
   logger:trace(string.format('PhotoDeckAPI.createGallery("%s", "%s", <collectionInfo>)', urlname, parentId))
   local galleryInfo = buildGalleryInfoFromLrCollectionInfo(collectionInfo)
+  galleryInfo['gallery[content_order]'] = 'manual-last'
   galleryInfo['gallery[parent]'] = parentId
   local response, error_msg = PhotoDeckAPI.request('POST', '/websites/' .. urlname .. '/galleries.xml', galleryInfo)
   local gallery = PhotoDeckAPIXSLT.transform(response, PhotoDeckAPIXSLT.gallery)
@@ -1314,6 +1315,27 @@ function PhotoDeckAPI.deleteGallery(urlname, galleryId)
   return response, error_msg
 end
 
+function PhotoDeckAPI.reorderGallery(urlname, galleryId, mediasIds)
+  logger:trace(string.format('PhotoDeckAPI.reorderGallery("%s", "%s", %s)', urlname, galleryId, printTable(mediasIds)))
+
+  local seq = ""
+  for i, uuid in pairs(mediasIds) do
+    if i == 1 then
+      seq = uuid
+    else
+      seq = seq .. "," .. uuid
+    end
+  end
+  logger:trace(seq)
+
+  local galleryInfo = {}
+  galleryInfo['gallery[content_order]'] = 'manual-last'
+  galleryInfo['gallery[medias_order]'] = seq
+
+  local response, error_msg = PhotoDeckAPI.request('PUT', '/websites/' .. urlname .. '/galleries/' .. galleryId .. '.xml', galleryInfo)
+
+  return response, error_msg
+end
 
 -- Done
 return PhotoDeckAPI

@@ -20,6 +20,7 @@ publishServiceProvider.hidePrintResolution = true
 
 -- General plugin configuration for publish operations
 publishServiceProvider.supportsIncrementalPublish = true
+publishServiceProvider.supportsCustomSortOrder = true
 publishServiceProvider.small_icon = 'photodeck16.png'
 publishServiceProvider.titleForPublishedCollection = LOC("$$$/PhotoDeck/Publish/Collection=Gallery")
 publishServiceProvider.titleForPublishedCollectionSet = LOC("$$$/PhotoDeck/Publish/CollectionSet=Folder")
@@ -491,6 +492,26 @@ publishServiceProvider.goToPublishedPhoto = function( publishSettings, info )
     end
   else
     LrErrors.throwUserError(LOC("$$$/PhotoDeck/GoToPublishedPhoto/CollectionNotFound=Error finding collection"))
+  end
+end
+
+
+-- Reorder collection
+publishServiceProvider.imposeSortOrderOnPublishedCollection = function( publishSettings, info, remoteIdSequence )
+  logger:trace('publishServiceProvider.imposeSortOrderOnPublishedCollection')
+  PhotoDeckAPI.connect(publishSettings.apiKey, publishSettings.apiSecret, publishSettings.username, publishSettings.password)
+
+  local urlname = publishSettings.websiteChosen
+  local galleryId = info.remoteCollectionId
+  local response
+  local error_msg
+
+  response, error_msg = PhotoDeckAPI.reorderGallery(urlname, galleryId, remoteIdSequence)
+  if error_msg then
+    LrErrors.throwUserError(LOC("$$$/PhotoDeck/UpdateCollection/ErrorReorderingGallery=Error reordering gallery: ^1", error_msg))
+    return false
+  else
+    return true
   end
 end
 

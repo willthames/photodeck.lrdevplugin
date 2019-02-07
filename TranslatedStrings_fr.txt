@@ -67,6 +67,7 @@
 "$$$/PhotoDeck/UpdateCollection/ErrorRenamingGallery=Erreur lors du renommage de la galerie: ^1"
 "$$$/PhotoDeck/UpdateCollection/ErrorReparentingGallery=Erreur lors du changement de parent de la galerie : ^1"
 "$$$/PhotoDeck/DeleteCollection/ErrorDeletingGallery=Erreur lors de la supression de la galerie : ^1"
+"$$$/PhotoDeck/UpdateCollection/ErrorReorderingGallery=Erreur lors de la modification de l'ordre dans la galerie: ^1"
 "$$$/PhotoDeck/API/UnknownError=Erreur inconnue"
 "$$$/PhotoDeck/API/HTTPError=Erreur HTTP ^1"
 "$$$/PhotoDeck/API/NoResponse=Pas de réponse du réseau"

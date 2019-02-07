@@ -1,3 +1,7 @@
+0.16.3 - 07/02/2019
+-------------------
+Reorder published photos directly from Lightroom (thanks to Kim Aldis)
+
 0.16.2 - 14/12/2018
 -------------------
 Add more logging in case of connection error
